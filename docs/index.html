@@ -43,8 +43,8 @@
       "softwareVersion": "0.8.1",
       "description": "An open-source MCP server that indexes a codebase into a persistent knowledge graph of functions, classes, call chains, HTTP routes, and cross-service links, so AI coding agents answer structural questions with roughly 120x fewer tokens than file-by-file search. Parses 158 languages via tree-sitter with Hybrid LSP semantic type resolution for 9 language families. Ships as a single static C binary with zero runtime dependencies.",
       "url": "https://deusdata.github.io/codebase-memory-mcp/",
-      "downloadUrl": "https://github.com/DeusData/codebase-memory-mcp/releases/latest",
-      "codeRepository": "https://github.com/DeusData/codebase-memory-mcp",
+      "downloadUrl": "https://github.com/pricing-side-proj/codebase-memory-mcp/releases",
+      "codeRepository": "https://github.com/pricing-side-proj/codebase-memory-mcp",
       "programmingLanguage": "C",
       "license": "https://opensource.org/licenses/MIT",
       "isAccessibleForFree": true,
@@ -94,7 +94,7 @@
           "@id": "https://deusdata.github.io/codebase-memory-mcp/#org",
           "name": "DeusData",
           "url": "https://github.com/DeusData",
-          "sameAs": ["https://github.com/DeusData/codebase-memory-mcp"]
+          "sameAs": ["https://github.com/pricing-side-proj/codebase-memory-mcp"]
         },
         {
           "@type": "WebSite",
@@ -107,7 +107,7 @@
           "@type": "BreadcrumbList",
           "itemListElement": [
             { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://deusdata.github.io/codebase-memory-mcp/" },
-            { "@type": "ListItem", "position": 2, "name": "GitHub", "item": "https://github.com/DeusData/codebase-memory-mcp" }
+            { "@type": "ListItem", "position": 2, "name": "GitHub", "item": "https://github.com/pricing-side-proj/codebase-memory-mcp" }
           ]
         }
       ]
@@ -165,7 +165,7 @@
           "name": "Does codebase-memory-mcp send my code anywhere?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. All indexing and querying happen 100% locally on your machine. There is no embedded LLM and no API key — your MCP client acts as the intelligence layer. Release binaries are signed, checksummed, and scanned by 70+ antivirus engines."
+            "text": "The server indexes locally and has no embedded LLM, but MCP query results are consumed by the configured coding agent and may be sent to that agent's LLM provider. The managed fork enforces a source-extension allowlist before indexing."
           }
         },
         {
@@ -431,7 +431,7 @@
             <a href="#semantic-search">Semantic search</a>
             <a href="#releases">Releases</a>
             <a href="#faq">FAQ</a>
-            <a class="nav-cta nav-star" href="https://github.com/DeusData/codebase-memory-mcp" title="Star codebase-memory-mcp on GitHub" aria-label="Star this project on GitHub">★ Star on GitHub</a>
+            <a class="nav-cta nav-star" href="https://github.com/pricing-side-proj/codebase-memory-mcp" title="Star codebase-memory-mcp on GitHub" aria-label="Star this project on GitHub">★ Star on GitHub</a>
         </span>
     </div>
 </nav>
@@ -453,8 +453,8 @@
             <div class="stat"><div class="number">43</div><div class="label">client surfaces</div></div>
         </div>
         <div class="cta-buttons">
-            <a href="https://github.com/DeusData/codebase-memory-mcp" class="cta-primary">View on GitHub</a>
-            <a href="https://github.com/DeusData/codebase-memory-mcp/releases/latest" class="cta-secondary">Download latest release</a>
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp" class="cta-primary">View managed fork</a>
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/releases" class="cta-secondary">Managed releases</a>
         </div>
     </header>
 
@@ -488,7 +488,8 @@
         <p class="muted">
             It is a structural-analysis backend, not a chatbot: there is no embedded LLM and no API key. Your
             MCP client (Claude Code, or any MCP-compatible agent) is the intelligence layer; codebase-memory-mcp
-            builds and serves the graph. All processing happens locally — your code never leaves your machine.
+            builds and serves the graph locally. MCP query results are returned to the configured coding agent,
+            which may send that content to its LLM provider.
         </p>
     </section>
 
@@ -509,19 +510,19 @@
             (less noise means better answers and no "lost in the middle" problem).
         </p>
         <p><cite>Source: project benchmark, 5 structural queries — see the
-            <a href="https://github.com/DeusData/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">full benchmark report</a>.</cite></p>
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">full benchmark report</a>.</cite></p>
     </section>
 
     <section id="install">
         <h2>How do I install codebase-memory-mcp?</h2>
         <p class="lead">
-            Install with a single command, then tell your agent to index the project. It is a single static C binary for
-            macOS, Linux, and Windows — no Docker, no runtime dependencies, no API key.
+            Obtain a reviewed archive and checksum from the managed distribution channel, then tell your agent to index
+            the project. The bundled installer performs no network access.
         </p>
         <div class="install-block">
-            <span class="comment"># 1. One-line install (macOS / Linux). Add --ui for the 3D graph UI.</span><br>
-            <span class="cmd">curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash</span><br><br>
-            <span class="comment"># 2. The installer configures detected clients; explicit flags cover conditional clients.</span><br><br>
+            <span class="comment"># 1. Verify the managed archive digest, extract it, and run its bundled installer.</span><br>
+            <span class="cmd">tar xzf codebase-memory-mcp-&lt;os&gt;-&lt;arch&gt;.tar.gz &amp;&amp; ./install.sh</span><br><br>
+            <span class="comment"># 2. The local-only installer configures detected clients.</span><br><br>
             <span class="comment"># 3. Restart your agent, then say:</span><br>
             <span class="cmd">"Index this project"</span>
         </div>
@@ -538,8 +539,8 @@
             and Sourcegraph Cody. <strong>Manual, UI, cloud, or repository-managed (not counted):</strong> Qodo,
             Warp MCP, JetBrains AI/ACP, GitHub Copilot coding agent, Jules, CodeRabbit, Replit, BLACKBOX AI,
             Plandex, and SWE-agent. Warp is counted above for its detected skill installation; its MCP connection
-            remains manual. Windows users run <code>install.ps1</code>. Also available via <code>npm</code>,
-            <code>pip</code>, Homebrew, Scoop, Winget, Chocolatey, AUR, and <code>go install</code>.
+            remains manual. Windows users run the <code>install.ps1</code> bundled beside the reviewed executable.
+            Public package-manager wrappers and self-update are intentionally disabled in this managed fork.
         </p>
         <p class="muted">
             Lifecycle installation follows documented context contracts: Qoder uses <code>SessionStart</code>,
@@ -672,7 +673,7 @@
         </p>
         <p><cite>Source: <a href="https://arxiv.org/abs/2603.27277">“Codebase-Memory: Tree-Sitter-Based Knowledge
             Graphs for LLM Code Exploration via MCP”</a>, arXiv:2603.27277 — and the
-            <a href="https://github.com/DeusData/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">project benchmark report</a>.</cite></p>
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">project benchmark report</a>.</cite></p>
     </section>
 
     <section id="performance">
@@ -775,13 +776,13 @@
     <section id="releases">
         <h2>What are the recent releases?</h2>
         <p class="lead">
-            The latest release notes are loaded live from GitHub. Each entry links to its full changelog.
+            Managed release notes are loaded from the fork. Each entry links to its full changelog.
         </p>
         <div id="releases-list">
             <p class="skeleton">Loading recent releases from GitHub…</p>
         </div>
         <p style="margin-top: 16px;">
-            <a href="https://github.com/DeusData/codebase-memory-mcp/releases">View all releases on GitHub →</a>
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/releases">View all releases on GitHub →</a>
         </p>
     </section>
 
@@ -789,8 +790,9 @@
         <h2>Frequently asked questions</h2>
 
         <h3>Does codebase-memory-mcp send my code anywhere?</h3>
-        <p>No. All indexing and querying happen 100% locally. There is no embedded LLM and no API key. Release
-           binaries are signed, checksummed, and scanned by 70+ antivirus engines.</p>
+        <p>The server indexes locally and has no embedded LLM, but MCP query results are consumed by the
+           configured coding agent and may be sent to that agent's LLM provider. The managed fork therefore
+           enforces a source-extension allowlist before indexing.</p>
 
         <h3>Does it support semantic or natural-language code search?</h3>
         <p>Yes. Alongside structural and full-text search, <code>search_graph</code>'s <code>semantic_query</code>
@@ -815,7 +817,7 @@
 
         <h3>Is it free and open source?</h3>
         <p>Yes. It is MIT licensed. The full source, signed release binaries, and checksums are on
-           <a href="https://github.com/DeusData/codebase-memory-mcp">GitHub</a>.</p>
+           <a href="https://github.com/pricing-side-proj/codebase-memory-mcp">the managed fork</a>.</p>
     </section>
 </main>
 
@@ -823,9 +825,9 @@
     <div class="container">
         <p>
             Open source, MIT licensed.
-            <a href="https://github.com/DeusData/codebase-memory-mcp">GitHub</a> &middot;
-            <a href="https://github.com/DeusData/codebase-memory-mcp/releases/latest">Releases</a> &middot;
-            <a href="https://github.com/DeusData/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">Benchmarks</a> &middot;
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp">GitHub</a> &middot;
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/releases">Managed releases</a> &middot;
+            <a href="https://github.com/pricing-side-proj/codebase-memory-mcp/blob/main/docs/BENCHMARK.md">Benchmarks</a> &middot;
             <a href="https://arxiv.org/abs/2603.27277">Paper</a>
         </p>
     </div>
@@ -833,7 +835,7 @@
 
 <script>
     (function () {
-        var REPO = 'DeusData/codebase-memory-mcp';
+        var REPO = 'pricing-side-proj/codebase-memory-mcp';
         var listEl = document.getElementById('releases-list');
         if (!listEl) return;
 

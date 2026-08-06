@@ -11,8 +11,14 @@ The managed fork at `pricing-side-proj/codebase-memory-mcp` is owned by
 - ensuring internal installations use a full commit SHA, never `main`, another
   branch name, or a moving release alias.
 
-This assignment governs the managed fork. The upstream authority model below
-continues to describe `DeusData/codebase-memory-mcp`.
+`@DanielDeng2024` is also the binding code owner and managed release operator
+for this fork. Managed binary releases may be created only through the gated
+release workflow; public package registries are disabled.
+
+This assignment and `.github/CODEOWNERS` govern the managed fork. The upstream
+authority model below is retained only as provenance for
+`DeusData/codebase-memory-mcp`; it does not grant upstream maintainers authority
+over this fork.
 
 This document defines how maintainer responsibility, review routing, and
 operational authority work in this project.

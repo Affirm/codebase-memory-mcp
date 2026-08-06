@@ -20,9 +20,9 @@
                       * test_cli_non_ascii_arg.py guards #423/#20  (wide-argv main())
                       * test_daemon_stability.py guards the daemon parameter
                         surface, crash recovery, busy-stop refusal, and churn
-                      * test_windows_update_handoff.py guards that `update`
-                        hands off to install.ps1 instead of replacing its own
-                        running image (the removed launcher stub's only job)
+                      * test_windows_update_handoff.py guards that managed
+                        `update` fails closed without network access or replacing
+                        its own running image
 
       KNOWN REDS  - genuine, still-open Windows bugs reproduced at the product
                     surface. They are EXPECTED to be RED (exit 1) and are opt-in

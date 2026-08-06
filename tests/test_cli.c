@@ -1404,39 +1404,19 @@ TEST(cli_update_download_failure_does_not_quiesce_sessions) {
     PASS();
 }
 
-TEST(cli_update_already_current_does_not_quiesce_sessions) {
-#ifdef _WIN32
-    /* The deterministic fake-curl fixture below is POSIX-only. The guarded
-     * ordering it exercises is platform-independent. */
-    PASS();
-#else
+TEST(cli_update_without_local_fixture_fails_closed_before_quiescing_sessions) {
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/cli-daemon-update-current-XXXXXX");
+    snprintf(tmpdir, sizeof(tmpdir), "/tmp/cli-daemon-update-closed-XXXXXX");
     if (!cbm_mkdtemp(tmpdir)) {
         FAIL("cbm_mkdtemp failed");
     }
     char *old_home = NULL;
     char *old_cache = NULL;
     cli_activation_save_env(&old_home, &old_cache);
-    const char *raw_path = getenv("PATH");
     const char *raw_download = getenv("CBM_DOWNLOAD_URL");
-    char *old_path = raw_path ? strdup(raw_path) : NULL;
     char *old_download = raw_download ? strdup(raw_download) : NULL;
     cbm_setenv("HOME", tmpdir, 1);
     cbm_unsetenv("CBM_DOWNLOAD_URL");
-
-    char bin_dir[512];
-    char fake_curl[640];
-    snprintf(bin_dir, sizeof(bin_dir), "%s/bin", tmpdir);
-    snprintf(fake_curl, sizeof(fake_curl), "%s/curl", bin_dir);
-    test_mkdirp(bin_dir);
-    write_test_file(
-        fake_curl,
-        "#!/bin/sh\n"
-        "printf '%s\\n' 'HTTP/1.1 302 Found' "
-        "'location: https://github.com/DeusData/codebase-memory-mcp/releases/tag/v0.0.0'\n");
-    bool fixture_ready = chmod(fake_curl, 0700) == 0;
-    cbm_setenv("PATH", bin_dir, 1);
 
     cli_activation_fake_t fake = {
         .participants_active = true,
@@ -1445,29 +1425,20 @@ TEST(cli_update_already_current_does_not_quiesce_sessions) {
     cbm_cli_activation_ops_t ops = cli_activation_fake_ops(&fake);
     cbm_cli_set_activation_ops_for_test(&ops);
     char *argv[] = {"--standard"};
-    int rc = fixture_ready ? cli_test_cmd_update(1, argv) : -1;
+    int rc = cli_test_cmd_update(1, argv);
     cbm_cli_set_activation_ops_for_test(NULL);
-
-    if (old_path) {
-        cbm_setenv("PATH", old_path, 1);
-    } else {
-        cbm_unsetenv("PATH");
-    }
     if (old_download) {
         cbm_setenv("CBM_DOWNLOAD_URL", old_download, 1);
     } else {
         cbm_unsetenv("CBM_DOWNLOAD_URL");
     }
-    free(old_path);
     free(old_download);
     cli_activation_restore_env(old_home, old_cache);
     test_rmdir_r(tmpdir);
 
-    ASSERT_TRUE(fixture_ready);
-    ASSERT_EQ(rc, 0);
+    ASSERT_EQ(rc, 1);
     ASSERT_EQ(fake.mutation_reserve_count, 0);
     PASS();
-#endif
 }
 
 TEST(cli_update_agent_configs_finish_before_guard_release) {
@@ -4324,21 +4295,6 @@ TEST(cli_supported_agent_surfaces_match_installers) {
         if (!strstr(data, required_agents[i])) {
             free(data);
             FAIL("README Multi-Agent Support table must include every installed agent");
-        }
-    }
-    free(data);
-
-    data = read_test_file_alloc("pkg/npm/README.md");
-    if (!data)
-        FAIL("could not read npm README for supported-agent contract");
-    if (!strstr(data, "43 supported automatic/conditional client surfaces")) {
-        free(data);
-        FAIL("npm README must describe all 43 automatic/conditional client surfaces accurately");
-    }
-    for (size_t i = 0; i < sizeof(required_agents) / sizeof(required_agents[0]); i++) {
-        if (!strstr(data, required_agents[i])) {
-            free(data);
-            FAIL("npm README must include every installed agent");
         }
     }
     free(data);
@@ -11896,12 +11852,9 @@ TEST(cli_sha256_file_matches_known_vector) {
 }
 
 #ifdef _WIN32
-/* The Windows update contract, asserted with the activation seam OFF so this
- * takes the exact dispatch a release binary ships: `update` never replaces the
- * running image in-process (Windows locks it), it prints the install.ps1
- * command and exits 0. Regressing to an in-process self-update would mean
- * reintroducing the launcher stub Defender flags as Trojan:Win32/Wacatac.B!ml. */
-TEST(cli_windows_update_hands_off_to_install_script) {
+/* The managed Windows update contract, asserted with the activation seam OFF:
+ * `update` fails closed and never replaces the running image. */
+TEST(cli_windows_update_fails_closed) {
     char tmpdir[256];
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/cli-update-handoff-XXXXXX");
     if (!cbm_mkdtemp(tmpdir)) {
@@ -11930,7 +11883,7 @@ TEST(cli_windows_update_hands_off_to_install_script) {
     cli_activation_restore_env(old_home, old_cache);
     test_rmdir_r(tmpdir);
 
-    ASSERT_EQ(update_rc, 0);
+    ASSERT_EQ(update_rc, 1);
     ASSERT_TRUE(preserved);
     PASS();
 }
@@ -11969,13 +11922,13 @@ SUITE(cli) {
     RUN_TEST(cli_install_config_and_path_finish_before_guard_release);
     RUN_TEST(cli_install_config_failure_keeps_published_binary);
     RUN_TEST(cli_update_download_failure_does_not_quiesce_sessions);
-    RUN_TEST(cli_update_already_current_does_not_quiesce_sessions);
+    RUN_TEST(cli_update_without_local_fixture_fails_closed_before_quiescing_sessions);
     RUN_TEST(cli_update_agent_configs_finish_before_guard_release);
     RUN_TEST(cli_uninstall_quiesces_active_cohort_before_removing_binary_and_index);
     RUN_TEST(cli_uninstall_preserves_binary_and_index_when_cohort_does_not_drain);
     RUN_TEST(cli_activation_guard_is_bypassed_for_dry_run_and_plan);
 #ifdef _WIN32
-    RUN_TEST(cli_windows_update_hands_off_to_install_script);
+    RUN_TEST(cli_windows_update_fails_closed);
 #endif
 
     /* Version (2 tests — selfupdate_test.go) */

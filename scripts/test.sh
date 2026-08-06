@@ -212,8 +212,8 @@ bash "$ROOT/tests/test_ui_dev_proxy_security.sh"
 echo "=== Step 0d: daemon soak recovery contract ==="
 bash "$ROOT/tests/test_soak_daemon_recovery_contract.sh"
 
-echo "=== Step 0e: Windows launcher bundle contract ==="
-bash "$ROOT/tests/test_windows_bundle_contract.sh"
+echo "=== Step 0e: managed distribution fail-closed contract ==="
+bash "$ROOT/scripts/ci/check-managed-distribution.sh"
 
 echo "=== Step 0f: tree-sitter runtime Makefile dependencies ==="
 bash "$ROOT/tests/test_makefile_ts_runtime_dependencies.sh"
@@ -221,8 +221,8 @@ bash "$ROOT/tests/test_makefile_ts_runtime_dependencies.sh"
 echo "=== Step 0g: security fuzz harness self-test ==="
 bash "$ROOT/tests/test_security_fuzz_harness.sh"
 
-echo "=== Step 0h: smoke release-fixture contract ==="
-bash "$ROOT/tests/test_smoke_fixture_contract.sh"
+echo "=== Step 0h: managed release packaging contract ==="
+bash "$ROOT/scripts/ci/check-managed-distribution.sh"
 
 echo "=== Step 0i: parallel suite scheduler contract ==="
 bash "$ROOT/tests/test_parallel_harness_contract.sh"

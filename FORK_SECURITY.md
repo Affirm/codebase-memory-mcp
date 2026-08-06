@@ -45,6 +45,24 @@ test "$(git rev-parse HEAD)" = "01ef52e21687eeb105c9dc32b438f681aa9bd828"
 Do not build or run if that verification fails. Do not install from the
 upstream release channels or from either repository's floating `main`.
 
+## Managed binary distribution
+
+The fork is distributed only as reviewed binary archives built from the exact
+`approved_fork_commit`. Every archive must be accompanied by a separately
+recorded SHA-256 digest and build provenance. Consumers must verify both the
+source commit and digest before installation.
+
+Network installers, self-update, floating release aliases, download URL
+overrides, and public package-manager wrappers are prohibited. The shell and
+PowerShell installers operate only on the binary bundled beside them and fail
+if that binary is absent. The `update` command fails closed; it never selects,
+downloads, or installs another build.
+
+The release workflow may publish the reviewed archives in this fork, but it
+must not publish npm, PyPI, Go, Homebrew, Chocolatey, Scoop, Winget, AUR,
+Glama, or MCP Registry wrappers. `scripts/ci/check-managed-distribution.sh`
+enforces this boundary in CI.
+
 ## Owner
 
 `@DanielDeng2024` owns this fork and is responsible for merging applicable

@@ -1,4 +1,4 @@
-"""GREEN native-Windows guard for the `update` -> install.ps1 handoff.
+"""GREEN native-Windows guard for managed `update` refusal.
 
 Windows ships ONE binary, exactly like Linux and macOS: ``codebase-memory-mcp.exe``.
 
@@ -8,16 +8,14 @@ cannot replace its own image on Windows.  Defender's ML scored that stub
 Trojan:Win32/Wacatac.B!ml on x64 no matter what the build changed (bcrypt-free,
 stripped, versioned and resource-free variants were all flagged), while the
 product binary itself scans clean everywhere.  So the swap moved OUT of the
-process into install.ps1, which runs while CBM is NOT running.
+process and all network distribution paths are disabled in the managed fork.
 
 This guard asserts the replacement contract on real native Windows:
 
-* ``update`` exits 0 and prints the exact install.ps1 command.
+* ``update`` exits non-zero with the managed-distribution refusal.
 * ``update`` NEVER replaces the running image in-process — the executable's
   bytes are unchanged, and no launcher/payload sibling appears next to it.
-* ``update`` refuses to reach the network first: it hands off before it
-  consults CBM_DOWNLOAD_URL, so it stays fast even when that URL is a black
-  hole.
+* ``update`` refuses to reach the network even when CBM_DOWNLOAD_URL is set.
 * ``update`` does not disturb an already-open MCP/daemon session.
 
 A regression here means the in-process self-update — and therefore the
@@ -102,18 +100,16 @@ def copy_binary(source, directory):
     return binary
 
 
-def assert_update_hands_off_to_install_script(source, env, work):
+def assert_update_fails_closed(source, env, work):
     binary = copy_binary(source, work / "update-handoff")
     before = sha256_file(binary)
     command_env = dict(env)
-    # If the handoff regresses into a real in-process update, keep its
-    # unintended network path deterministic and fast: a correct implementation
-    # never consults this URL.
+    # An arbitrary override must not reopen the managed distribution boundary.
     command_env["CBM_DOWNLOAD_URL"] = "https://127.0.0.1:1"
 
     # Warm the freshly-copied cold binary first: first-touch antivirus scanning
     # of the just-written image inflates process load time, and the handoff
-    # itself is a fast STATELESS local print (no daemon IPC, no download) whose
+    # itself is a fast stateless refusal (no daemon IPC, no download) whose
     # timing is what this guard measures. The warm-up behaves identically.
     run([binary, "update", "--yes", "--standard"], command_env, timeout=20)
     started = time.monotonic()
@@ -123,21 +119,17 @@ def assert_update_hands_off_to_install_script(source, env, work):
     lowered = diagnostic.lower()
 
     require(
-        result.returncode == 0,
-        "update exited %s; the Windows handoff must succeed: %s"
+        result.returncode != 0,
+        "managed update unexpectedly succeeded with %s: %s"
         % (result.returncode, diagnostic[-800:]),
     )
     require(
-        "install.ps1" in lowered,
-        "update did not print the install.ps1 command: %s" % diagnostic[-800:],
-    )
-    require(
-        "powershell" in lowered,
-        "update did not print a runnable PowerShell command: %s" % diagnostic[-800:],
+        "self-update is disabled in this managed build" in lowered,
+        "update did not state the managed refusal: %s" % diagnostic[-800:],
     )
     require(
         elapsed < 8.0,
-        "update took %.1fs — it must hand off before any network I/O" % elapsed,
+        "update took %.1fs — it must refuse before any network I/O" % elapsed,
     )
     require(
         sha256_file(binary) == before,
@@ -152,7 +144,7 @@ def assert_update_hands_off_to_install_script(source, env, work):
         not list(binary.parent.glob("*launcher*")),
         "update produced a launcher artifact beside the binary",
     )
-    print("PASS: update handed off to install.ps1 without touching its own image")
+    print("PASS: managed update failed closed without touching its own image")
 
 
 def assert_update_does_not_drain_active_session(source, env, cache, work):
@@ -166,8 +158,8 @@ def assert_update_does_not_drain_active_session(source, env, cache, work):
         command_env["CBM_DOWNLOAD_URL"] = "https://127.0.0.1:1"
         result = run([command, "update", "--yes", "--standard"], command_env, timeout=20)
         require(
-            result.returncode == 0,
-            "update exited %s beside a live session: %s"
+            result.returncode != 0,
+            "managed update unexpectedly succeeded (%s) beside a live session: %s"
             % (result.returncode, output_text(result)[-800:]),
         )
         # The same already-open stdio session must still own the same live
@@ -196,9 +188,9 @@ def main():
     work = pathlib.Path(tempfile.mkdtemp(prefix="cbm_win_update_"))
     try:
         env, cache = isolated_environment(work)
-        assert_update_hands_off_to_install_script(source, env, work)
+        assert_update_fails_closed(source, env, work)
         assert_update_does_not_drain_active_session(source, env, cache, work)
-        print("\nGREEN: Windows update handoff contract honored.")
+        print("\nGREEN: Windows managed update refusal contract honored.")
         return 0
     except (GuardFailure, McpError, OSError, subprocess.SubprocessError) as exc:
         print("\nRED: %s" % exc)

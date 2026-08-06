@@ -9,53 +9,53 @@
 # approval for the matching path.
 
 # Default owner gate: every pull request crosses the project owner's desk.
-* @DeusData
+* @DanielDeng2024
 
 # Security-sensitive and authority-sensitive surfaces.
-/.github/ @DeusData
-/scripts/ @DeusData
-/Makefile.cbm @DeusData
-/SECURITY.md @DeusData
-/docs/SECURITY-DISCLOSURE.md @DeusData
-/CONTRIBUTING.md @DeusData
-/CODE_OF_CONDUCT.md @DeusData
-/DCO @DeusData
-/LICENSE @DeusData
-/MAINTAINERS.md @DeusData
+/.github/ @DanielDeng2024
+/scripts/ @DanielDeng2024
+/Makefile.cbm @DanielDeng2024
+/SECURITY.md @DanielDeng2024
+/docs/SECURITY-DISCLOSURE.md @DanielDeng2024
+/CONTRIBUTING.md @DanielDeng2024
+/CODE_OF_CONDUCT.md @DanielDeng2024
+/DCO @DanielDeng2024
+/LICENSE @DanielDeng2024
+/MAINTAINERS.md @DanielDeng2024
 
 # Release and distribution surfaces.
-/pkg/ @DeusData
-/install.sh @DeusData
-/install.ps1 @DeusData
-/server.json @DeusData
-/glama.json @DeusData
-/flake.nix @DeusData
-/flake.lock @DeusData
-/THIRD_PARTY.md @DeusData
-/vendored/ @DeusData
-/internal/cbm/vendored/ @DeusData
+/pkg/ @DanielDeng2024
+/install.sh @DanielDeng2024
+/install.ps1 @DanielDeng2024
+/server.json @DanielDeng2024
+/glama.json @DanielDeng2024
+/flake.nix @DanielDeng2024
+/flake.lock @DanielDeng2024
+/THIRD_PARTY.md @DanielDeng2024
+/vendored/ @DanielDeng2024
+/internal/cbm/vendored/ @DanielDeng2024
 
 # Core product surfaces.
-/src/foundation/ @DeusData
-/src/store/ @DeusData
-/src/cypher/ @DeusData
-/src/graph_buffer/ @DeusData
-/src/mcp/ @DeusData
-/src/cli/ @DeusData
-/src/discover/ @DeusData
-/src/watcher/ @DeusData
-/src/pipeline/ @DeusData
-/src/git/ @DeusData
-/src/semantic/ @DeusData
-/src/simhash/ @DeusData
-/src/traces/ @DeusData
-/src/ui/ @DeusData
+/src/foundation/ @DanielDeng2024
+/src/store/ @DanielDeng2024
+/src/cypher/ @DanielDeng2024
+/src/graph_buffer/ @DanielDeng2024
+/src/mcp/ @DanielDeng2024
+/src/cli/ @DanielDeng2024
+/src/discover/ @DanielDeng2024
+/src/watcher/ @DanielDeng2024
+/src/pipeline/ @DanielDeng2024
+/src/git/ @DanielDeng2024
+/src/semantic/ @DanielDeng2024
+/src/simhash/ @DanielDeng2024
+/src/traces/ @DanielDeng2024
+/src/ui/ @DanielDeng2024
 
 # Extraction, language support, and graph UI.
-/internal/cbm/ @DeusData
-/tools/ @DeusData
-/graph-ui/ @DeusData
+/internal/cbm/ @DanielDeng2024
+/tools/ @DanielDeng2024
+/graph-ui/ @DanielDeng2024
 
 # Test and reproduction infrastructure.
-/tests/ @DeusData
-/test-infrastructure/ @DeusData
+/tests/ @DanielDeng2024
+/test-infrastructure/ @DanielDeng2024

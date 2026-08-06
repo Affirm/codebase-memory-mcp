@@ -55,7 +55,6 @@ CANONICAL = re.compile(
     r"|scripts/check-no-test-skips\.sh"
     r"|scripts/check-lsp-originality\.sh"
     r"|scripts/test-windows\.ps1"
-    r"|pkg/glama/verify\.sh"
 )
 
 # ── Layer 1: forbidden in ANY workflow (the known drift signatures) ──
@@ -98,18 +97,11 @@ ALLOWED_CMDS = {
     # CI plumbing
     "gh", "python3", "node", "codesign", "xcrun", "command", "awk",
 }
-# Per-file additions: _build.yml packages artifacts (make/strip are packaging
-# steps, not test legs) and drives npm for the embedded UI; release.yml pushes finished artifacts to registries after
-# every product-exercising gate already ran; the brew tap smoke installs the
-# released formula.
+# Per-file additions: _build.yml packages artifacts and drives npm only for the
+# embedded UI; release.yml signs and publishes the managed binary archives.
 ALLOWED_EXTRA = {
     "_build.yml": {"make", "npm", "strip", "install_name_tool", "otool", "ldd"},
-    # The npm-wrapper failure-handling test is its own leg (package.json's test
-    # script is its entry). RECORDED gap: it has no local-ladder equivalent.
-    "_test.yml": {"npm"},
-    "release.yml": {"npm", "pip", "pip3", "twine", "python", "make",
-                    "./mcp-publisher"},
-    "_smoke.yml": {"codebase-memory-mcp"},  # brew-installed CLI version check
+    "release.yml": {"python", "make"},
 }
 # Steps that are scanners/data-generators with inherently inline bodies, keyed
 # "<file>:<step name>". Additions here are DELIBERATE holes — keep tiny.

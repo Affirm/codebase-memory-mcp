@@ -6812,9 +6812,6 @@ static bool cli_download_is_explicit_file_override(const char *url) {
 }
 
 static const char *cli_download_protocol(const char *url) {
-    if (url && strncmp(url, "https://", 8) == 0) {
-        return "=https";
-    }
     if (url && strncmp(url, "file://", 7) == 0 && cli_download_is_explicit_file_override(url)) {
         return "=file";
     }
@@ -6825,9 +6822,8 @@ static const char *cli_download_protocol(const char *url) {
 static int cbm_download_to_file(const char *url, const char *dest) {
     const char *protocol = cli_download_protocol(url);
     if (!protocol || !dest) {
-        (void)fprintf(stderr, "error: update downloads require HTTPS (file:// is "
-                              "reserved for an explicit CBM_DOWNLOAD_URL test "
-                              "override)\n");
+        (void)fprintf(stderr, "error: managed builds disable network updates; file:// is "
+                              "reserved for the explicit test seam\n");
         return CLI_TRUE;
     }
     const char *argv[] = {"curl",    "-fSL",   "--progress-bar",
@@ -6840,9 +6836,8 @@ static int cbm_download_to_file(const char *url, const char *dest) {
 static int cbm_download_to_file_quiet(const char *url, const char *dest) {
     const char *protocol = cli_download_protocol(url);
     if (!protocol || !dest) {
-        (void)fprintf(stderr, "error: checksum downloads require HTTPS (file:// is "
-                              "reserved for an explicit CBM_DOWNLOAD_URL test "
-                              "override)\n");
+        (void)fprintf(stderr, "error: managed builds disable network checksum downloads; "
+                              "file:// is reserved for the explicit test seam\n");
         return CLI_TRUE;
     }
     const char *argv[] = {"curl",   "-fsSL", "--proto", protocol, "--proto-redir",
@@ -6895,15 +6890,13 @@ static int verify_download_checksum(const char *archive_path, const char *archiv
         cbm_safe_getenv("CBM_DOWNLOAD_URL", dl_base_buf, sizeof(dl_base_buf), NULL);
     char checksum_url[CLI_BUF_512];
     int checksum_url_length;
-    if (dl_base && dl_base[0]) {
-        checksum_url_length =
-            snprintf(checksum_url, sizeof(checksum_url), "%s/checksums.txt", dl_base);
-    } else {
-        checksum_url_length =
-            snprintf(checksum_url, sizeof(checksum_url), "%s",
-                     "https://github.com/DeusData/codebase-memory-mcp/releases/latest/"
-                     "download/checksums.txt");
+    if (!dl_base || strncmp(dl_base, "file://", 7) != 0) {
+        (void)fprintf(stderr, "error: update test seam requires an explicit file:// fixture\n");
+        cbm_unlink(checksum_file);
+        return CLI_ERR;
     }
+    checksum_url_length =
+        snprintf(checksum_url, sizeof(checksum_url), "%s/checksums.txt", dl_base);
     if (checksum_url_length <= 0 || (size_t)checksum_url_length >= sizeof(checksum_url)) {
         cbm_unlink(checksum_file);
         return CLI_ERR;
@@ -11147,8 +11140,11 @@ static void build_update_url(char *url, int url_sz, const char *os, const char *
     char base_url_buf[CLI_BUF_512];
     const char *base_url =
         cbm_safe_getenv("CBM_DOWNLOAD_URL", base_url_buf, sizeof(base_url_buf), NULL);
-    if (!base_url || !base_url[0]) {
-        base_url = "https://github.com/DeusData/codebase-memory-mcp/releases/latest/download";
+    if (!base_url || strncmp(base_url, "file://", 7) != 0) {
+        if (url_sz > 0) {
+            url[0] = '\0';
+        }
+        return;
     }
     /* Linux ships a fully-static "-portable" build; the standard linux binary
      * dynamically links glibc 2.38+ and fails on older distros. macOS/Windows
@@ -11273,80 +11269,6 @@ static int select_update_variant(int variant_flag) {
     return (choice[0] == '2') ? CLI_TRUE : 0;
 }
 
-/* Case-insensitive prefix match (portable — no strncasecmp dependency). */
-static bool prefix_icase(const char *s, const char *prefix) {
-    while (*prefix) {
-        if (tolower((unsigned char)*s) != tolower((unsigned char)*prefix)) {
-            return false;
-        }
-        s++;
-        prefix++;
-    }
-    return true;
-}
-
-/* Fetch latest release tag from GitHub via redirect header.
- * Returns heap-allocated tag (e.g. "v0.5.7") or NULL on failure. */
-static char *fetch_latest_tag(void) {
-    FILE *fp = cbm_popen(
-        "curl -sfI https://github.com/DeusData/codebase-memory-mcp/releases/latest 2>/dev/null",
-        "r");
-    if (!fp) {
-        return NULL;
-    }
-    char line[CBM_SZ_512];
-    char *tag = NULL;
-    while (fgets(line, sizeof(line), fp)) {
-        if (!prefix_icase(line, "location:")) {
-            continue;
-        }
-        char *slash = strrchr(line, '/');
-        if (!slash) {
-            break;
-        }
-        slash++;
-        size_t len = strlen(slash);
-        while (len > 0 && (slash[len - SKIP_ONE] == '\r' || slash[len - SKIP_ONE] == '\n' ||
-                           slash[len - SKIP_ONE] == ' ')) {
-            slash[--len] = '\0';
-        }
-        if (len > 0) {
-            tag = strdup(slash);
-        }
-        break;
-    }
-    cbm_pclose(fp);
-    return tag;
-}
-
-/* Check if current version is already latest. Returns true to skip update. */
-static bool check_already_latest(void) {
-    char dl_env[CBM_SZ_256] = "";
-    cbm_safe_getenv("CBM_DOWNLOAD_URL", dl_env, sizeof(dl_env), NULL);
-    if (dl_env[0]) {
-        return false; /* testing override — always update */
-    }
-    char *latest = fetch_latest_tag();
-    if (!latest) {
-        (void)fprintf(stderr, "warning: could not check latest version (network unavailable?). "
-                              "Proceeding with update.\n");
-        return false;
-    }
-    int cmp = cbm_compare_versions(latest, CBM_VERSION);
-    if (cmp <= 0) {
-        if (cmp < 0) {
-            printf("Already up to date (%s, ahead of latest %s).\n", CBM_VERSION, latest);
-        } else {
-            printf("Already up to date (%s).\n", CBM_VERSION);
-        }
-        free(latest);
-        return true;
-    }
-    printf("Update available: %s -> %s\n", CBM_VERSION, latest);
-    free(latest);
-    return false;
-}
-
 #endif /* CBM_CLI_ENABLE_TEST_API */
 
 int cbm_cmd_update(int argc, char **argv) {
@@ -11371,84 +11293,24 @@ int cbm_cmd_update(int argc, char **argv) {
         }
     }
 
-    /* Updates run from the install script, not from this process — on every
-     * platform.
-     *
-     * Windows forced the split first: a running .exe cannot replace itself, so
-     * an in-process updater needed a second resident binary to swap the first
-     * one out, and that launcher stub was exactly the shape Defender's ML
-     * scores as a dropper.
-     *
-     * The rest followed for the same reason rather than a different one. An
-     * in-process updater is, structurally, a downloader: it fetches a remote
-     * archive, extracts it, marks the result executable and runs it. That is
-     * the behaviour Microsoft's Wacatac family describes almost verbatim, and
-     * carrying it in the product binary put download/extract/chmod/exec in
-     * every shipped artifact for a command most users run a handful of times.
-     *
-     * The install script already does all of it, is idempotent -- so re-running
-     * it IS the update -- and runs while cbm is NOT running. Print the exact
-     * command instead of feigning self-update. */
 #ifndef CBM_CLI_ENABLE_TEST_API
-    /* A release build has nothing to do but hand off. The flags are still
-     * parsed and validated above, so `update --dry-run` and friends keep
-     * rejecting typos instead of silently accepting them. */
     (void)dry_run;
     (void)force;
     (void)variant_flag;
-#endif
-#ifdef CBM_CLI_ENABLE_TEST_API
-    if (g_cli_activation_test_ops_set) {
-        (void)fprintf(stderr, "*** cbm test seam: portable update flow engaged; the "
-                              "script-update handoff is bypassed (test builds only) ***\n");
-    } else
-#endif
-    {
-        char self_dir[CLI_BUF_1K] = {0};
-        bool have_dir = false;
-#ifdef _WIN32
-        /* Native separators on purpose: this path is printed for the user to
-         * paste into PowerShell verbatim. */
-        DWORD self_len = GetModuleFileNameA(NULL, self_dir, (DWORD)sizeof(self_dir));
-        char *last_sep =
-            (self_len > 0 && (size_t)self_len < sizeof(self_dir)) ? strrchr(self_dir, '\\') : NULL;
+    (void)fprintf(stderr,
+                  "error: self-update is disabled in this managed build; install an exact "
+                  "approved release artifact through the managed distribution channel\n");
+    return CLI_TRUE;
 #else
-        char *last_sep = cbm_detect_self_path(self_dir, sizeof(self_dir), cbm_get_home_dir())
-                             ? strrchr(self_dir, '/')
-                             : NULL;
-#endif
-        if (last_sep) {
-            *last_sep = '\0';
-            have_dir = true;
-        }
-        printf("codebase-memory-mcp update (current: %s)\n\n", CBM_VERSION);
-#ifdef _WIN32
-        printf("The update runs from install.ps1, not from this process. Close any\n"
-               "running sessions, then run\n\n");
-        if (have_dir) {
-            printf("  powershell -ExecutionPolicy Bypass -File \"%s\\install.ps1\"\n\n", self_dir);
-        } else {
-            printf("  powershell -ExecutionPolicy Bypass -File install.ps1\n"
-                   "  (ships in the release archive, and is placed beside the\n"
-                   "  binary on install)\n\n");
-        }
-        printf("It downloads the latest release, verifies its checksum, and replaces\n"
-               "this binary in place. If PowerShell refuses to run the script because\n"
-               "it came from the internet, Unblock-File it first.\n");
-#else
-        printf("The update runs from install.sh, not from this process. Run\n\n");
-        if (have_dir) {
-            printf("  bash \"%s/install.sh\"\n\n", self_dir);
-        } else {
-            printf("  install.sh (ships in the release archive, and is placed\n"
-                   "  beside the binary on install)\n\n");
-        }
-        printf("It downloads the latest release, verifies its checksum, and replaces\n"
-               "this binary in place. install.sh is idempotent, so re-running it IS\n"
-               "the update; pass --ui for the UI build.\n");
-#endif
-        return 0;
+    if (!g_cli_activation_test_ops_set) {
+        (void)fprintf(stderr,
+                      "error: self-update is disabled in this managed build; install an exact "
+                      "approved release artifact through the managed distribution channel\n");
+        return CLI_TRUE;
     }
+    (void)fprintf(stderr, "*** cbm test seam: local file update flow engaged (test builds only) "
+                          "***\n");
+#endif
 
     /* Everything below is the in-process updater and is excluded from release
      * builds entirely -- that exclusion, not dead-code elimination, is what
@@ -11463,10 +11325,7 @@ int cbm_cmd_update(int argc, char **argv) {
 
     printf("codebase-memory-mcp update (current: %s)\n\n", CBM_VERSION);
 
-    /* Version check — skip download if already on latest (not in dry-run). */
-    if (!force && !dry_run && check_already_latest()) {
-        return 0;
-    }
+    (void)force;
 
     /* Step 1: Check for existing indexes */
     bool delete_indexes = false;

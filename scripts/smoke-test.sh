@@ -946,48 +946,24 @@ if ! echo "$UNINSTALL_OUT" | grep -qi 'uninstall\|remov'; then
 fi
 echo "OK: uninstall --dry-run completed"
 
-# 6c: update --dry-run --standard -y
-# The product binary never replaces itself on ANY platform. `update` is a
-# handoff: it prints the shipped install script's command and exits 0. An
-# in-process updater is structurally a downloader -- fetch archive, extract,
-# chmod, exec -- which is impossible on Windows without a second resident
-# binary, and is the shape Defender's ML scores as a dropper everywhere else.
+# 6c: update fails closed in managed builds
 echo "--- Phase 6c: update --dry-run ---"
-if [[ "$BINARY" == *.exe ]]; then
-  UPDATE_SCRIPT="install.ps1"
-else
-  UPDATE_SCRIPT="install.sh"
-fi
-if ! UPDATE_OUT=$(run_dryrun_env "$BINARY" update --dry-run --standard -y 2>&1); then
-  echo "FAIL: update handoff exited non-zero"
+if UPDATE_OUT=$(run_dryrun_env "$BINARY" update --dry-run --standard -y 2>&1); then
+  echo "FAIL: managed update unexpectedly succeeded"
   echo "$UPDATE_OUT"
   exit 1
 fi
-if ! echo "$UPDATE_OUT" | grep -q "$UPDATE_SCRIPT"; then
-  echo "FAIL: update did not print the $UPDATE_SCRIPT handoff"
+if ! echo "$UPDATE_OUT" | grep -q 'self-update is disabled in this managed build'; then
+  echo "FAIL: update did not report the managed distribution boundary"
   echo "$UPDATE_OUT"
   exit 1
 fi
-# A handoff that still fetched something would defeat the entire point.
-if echo "$UPDATE_OUT" | grep -qiE 'downloading |releases/latest/download'; then
-  echo "FAIL: update still performs an in-process download"
+if echo "$UPDATE_OUT" | grep -qiE 'downloading |https?://|install\.(sh|ps1)'; then
+  echo "FAIL: update advertised a download or installer bypass"
   echo "$UPDATE_OUT"
   exit 1
 fi
-echo "OK: update hands off to $UPDATE_SCRIPT without downloading"
-
-# The glibc constraint did NOT disappear with in-process update -- it moved. The
-# standard linux asset dynamically links glibc 2.38+ and breaks on Debian 11,
-# RHEL 8 and Ubuntu 20.04, so the installer must fetch the static "-portable"
-# build. Guard it where the behaviour now lives instead of retiring the
-# protection along with the code that used to implement it.
-if [ -f "$REPO_ROOT/install.sh" ]; then
-  if ! grep -q 'PORTABLE="-portable"' "$REPO_ROOT/install.sh"; then
-    echo "FAIL: install.sh no longer selects the static -portable Linux asset"
-    exit 1
-  fi
-  echo "OK: install.sh targets the -portable (static) Linux asset"
-fi
+echo "OK: update fails closed without a download or installer handoff"
 
 # 6d: config set/get/reset round-trip
 echo "--- Phase 6d: config set/get/reset ---"
@@ -2939,10 +2915,7 @@ echo ""
 echo "=== Phase 14: update + uninstall E2E ==="
 
 if [ -n "${SMOKE_DOWNLOAD_URL:-}" ]; then
-  # ── 14a-f: Real update command against the local release fixture ──
-  # Curl/installer phases below keep using the loopback HTTP artifact server.
-  # Native update intentionally accepts only HTTPS, plus an explicit file://
-  # CBM_DOWNLOAD_URL test override, so point it directly at the same fixture.
+  # ── 14a-f: Managed update refusal + uninstall ──
   UPDATE_DOWNLOAD_URL="$SMOKE_DOWNLOAD_URL"
   if [ -n "${SMOKE_UPDATE_FIXTURE_DIR:-}" ]; then
     UPDATE_FIXTURE_DIR="$SMOKE_UPDATE_FIXTURE_DIR"
@@ -3003,7 +2976,7 @@ if [ -n "${SMOKE_DOWNLOAD_URL:-}" ]; then
     'import json, os; print(json.dumps({"mcpServers":{"codebase-memory-mcp":{"command":os.environ["STALE_CMD"]}}}))' \
     > "$UPDATE_HOME/.claude.json"
 
-  # 14a: Run actual update command (detect variant from available archive)
+  # 14a: Even a supplied local fixture must not enable production self-update.
   UPDATE_VARIANT="--standard"
   if curl --noproxy '*' -sf "$SMOKE_DOWNLOAD_URL/" 2>/dev/null | grep -q "ui-"; then
     UPDATE_VARIANT="--ui"
@@ -3014,29 +2987,26 @@ if [ -n "${SMOKE_DOWNLOAD_URL:-}" ]; then
   # fixture ad-hoc re-signs its copy on macOS, so the two differ before `update`
   # is ever invoked and the assertion fires on a difference the fixture created.
   UPDATE_BIN_SHA_BEFORE=$(smoke_file_sha256 "$UPDATE_DRIVER")
+  set +e
   HOME="$UPDATE_HOME" CBM_DOWNLOAD_URL="$UPDATE_DOWNLOAD_URL" \
     "$UPDATE_DRIVER" update $UPDATE_VARIANT -y > "$UPDATE_LOG" 2>&1
   UPDATE_RC=$?
+  set -e
   cat "$UPDATE_LOG"
 
-  # Contract, every platform: update NEVER replaces the running image in
-  # process. It exits 0 and prints the shipped install script's command. On
-  # Windows regressing this means reintroducing the AV-flagged launcher stub;
-  # everywhere else it means putting download -> extract -> chmod -> exec back
-  # into the product binary.
-  if [ "$UPDATE_RC" -ne 0 ]; then
-    echo "FAIL 14a: update exited rc=$UPDATE_RC (expected 0)"
+  if [ "$UPDATE_RC" -eq 0 ]; then
+    echo "FAIL 14a: managed update unexpectedly succeeded"
     exit 1
   fi
-  if ! grep -q "$UPDATE_SCRIPT" "$UPDATE_LOG"; then
-    echo "FAIL 14a: update did not print the $UPDATE_SCRIPT command"
+  if ! grep -q 'self-update is disabled in this managed build' "$UPDATE_LOG"; then
+    echo "FAIL 14a: managed update refusal was not explicit"
     exit 1
   fi
   if [ "$UPDATE_BIN_SHA_BEFORE" != "$(smoke_file_sha256 "$UPDATE_DRIVER")" ]; then
     echo "FAIL 14a: update replaced the binary in-process"
     exit 1
   fi
-  echo "OK 14a: update handed off to $UPDATE_SCRIPT without touching the binary"
+  echo "OK 14a: update failed closed without touching the binary"
   rm -f "$UPDATE_LOG"
 
   # 14b: Verify new binary exists and runs
@@ -3056,13 +3026,10 @@ if [ -n "${SMOKE_DOWNLOAD_URL:-}" ]; then
     echo "FAIL 14b: updated binary doesn't run"
     exit 1
   fi
-  echo "OK 14b: updated binary runs"
+  echo "OK 14b: existing binary still runs"
 
-  # 14c: there is no in-process update on any platform now, so there is no
-  # config refresh for this phase to assert. The install script re-runs
-  # `install`, which performs the refresh and is covered by Phase 8 (agent
-  # config install E2E) and Phase 13 (install script E2E).
-  echo "SKIP 14c: update hands off to $UPDATE_SCRIPT (config refresh covered by install)"
+  # 14c: a refused update must not rewrite configuration.
+  echo "SKIP 14c: managed update is disabled (config refresh covered by install)"
 
   # ── 14d-f: Real uninstall with binary removal ──
   # First verify binary + configs exist
@@ -3274,12 +3241,16 @@ if [ "$DL_OS" != "windows" ] && [ -f "$REPO_ROOT/install.sh" ]; then
   echo "--- Phase 13: install.sh E2E ---"
   INSTALL_TEST_HOME=$(smoke_mktemp_dir)
   INSTALL_TEST_DIR=$(smoke_mktemp_dir)
+  INSTALL_BUNDLE_DIR=$(smoke_mktemp_dir)
   mkdir -p "$INSTALL_TEST_HOME/.claude"
   mkdir -p "$INSTALL_TEST_HOME/.local/bin"
+  copy_smoke_binary "$INSTALL_BUNDLE_DIR/codebase-memory-mcp"
+  cp "$REPO_ROOT/install.sh" "$INSTALL_BUNDLE_DIR/install.sh"
+  chmod 755 "$INSTALL_BUNDLE_DIR/codebase-memory-mcp" "$INSTALL_BUNDLE_DIR/install.sh"
 
-  # 13a: run install.sh with local URL + isolated HOME
-  HOME="$INSTALL_TEST_HOME" CBM_DOWNLOAD_URL="$SMOKE_DOWNLOAD_URL" \
-    "$REPO_ROOT/install.sh" --dir="$INSTALL_TEST_DIR" 2>&1 || true
+  # 13a: run the local-only installer from a complete staged bundle.
+  HOME="$INSTALL_TEST_HOME" \
+    "$INSTALL_BUNDLE_DIR/install.sh" --dir="$INSTALL_TEST_DIR" 2>&1 || true
 
   # 13b: binary placed
   if [ ! -f "$INSTALL_TEST_DIR/codebase-memory-mcp" ]; then
@@ -3332,24 +3303,27 @@ if [ "$DL_OS" != "windows" ] && [ -f "$REPO_ROOT/install.sh" ]; then
     echo "OK 13f: PATH setup (rc file may not have been modified if already present)"
   fi
 
-  smoke_rmtree "$INSTALL_TEST_HOME" "$INSTALL_TEST_DIR"
+  smoke_rmtree "$INSTALL_TEST_HOME" "$INSTALL_TEST_DIR" "$INSTALL_BUNDLE_DIR"
 
 elif [ -f "$REPO_ROOT/install.ps1" ] && command -v powershell.exe &>/dev/null; then
   echo "--- Phase 13: install.ps1 E2E (Windows) ---"
   PS1_TEST_HOME=$(smoke_mktemp_dir)
   PS1_TEST_DIR=$(smoke_mktemp_dir)
+  PS1_BUNDLE_DIR=$(smoke_mktemp_dir)
   mkdir -p "$PS1_TEST_HOME/.claude"
+  cp "$BINARY" "$PS1_BUNDLE_DIR/codebase-memory-mcp.exe"
+  cp "$REPO_ROOT/install.ps1" "$PS1_BUNDLE_DIR/install.ps1"
 
   # Convert MSYS paths to Windows paths for PowerShell
   if command -v cygpath &>/dev/null; then
     WIN_DIR=$(cygpath -w "$PS1_TEST_DIR")
     WIN_URL="$SMOKE_DOWNLOAD_URL"
-    WIN_SCRIPT=$(cygpath -w "$REPO_ROOT/install.ps1")
+    WIN_SCRIPT=$(cygpath -w "$PS1_BUNDLE_DIR/install.ps1")
     WIN_HOME=$(cygpath -w "$PS1_TEST_HOME")
   else
     WIN_DIR="$PS1_TEST_DIR"
     WIN_URL="$SMOKE_DOWNLOAD_URL"
-    WIN_SCRIPT="$REPO_ROOT/install.ps1"
+    WIN_SCRIPT="$PS1_BUNDLE_DIR/install.ps1"
     WIN_HOME="$PS1_TEST_HOME"
   fi
 
@@ -3360,7 +3334,7 @@ elif [ -f "$REPO_ROOT/install.ps1" ] && command -v powershell.exe &>/dev/null; t
   # and invoke the script directly: powershell.exe -Command appends native argv
   # to the command text instead of reliably exposing it through $args.
   if ! HOME="$WIN_HOME" TEMP="$WIN_HOME" TMP="$WIN_HOME" \
-    CBM_DOWNLOAD_URL="$WIN_URL" CBM_ARCH="$DL_ARCH" MSYS2_ARG_CONV_EXCL='*' \
+    CBM_ARCH="$DL_ARCH" MSYS2_ARG_CONV_EXCL='*' \
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
       "$WIN_SCRIPT" "--dir=$WIN_DIR" 2>&1; then
     echo "FAIL 13f: install.ps1 execution failed"
@@ -3387,7 +3361,7 @@ elif [ -f "$REPO_ROOT/install.ps1" ] && command -v powershell.exe &>/dev/null; t
     exit 1
   fi
 
-  smoke_rmtree "$PS1_TEST_HOME" "$PS1_TEST_DIR"
+  smoke_rmtree "$PS1_TEST_HOME" "$PS1_TEST_DIR" "$PS1_BUNDLE_DIR"
 else
   echo "SKIP Phase 13: no install script available for this platform"
 fi
