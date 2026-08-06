@@ -630,26 +630,6 @@ int cbm_pipeline_pass_semantic_edges(cbm_pipeline_ctx_t *ctx);
  * cycles (recursive). Runs on the graph buffer before the dump. */
 void cbm_pipeline_pass_complexity(cbm_pipeline_ctx_t *ctx);
 
-/* ── Env URL scanner (pass_envscan.c) ────────────────────────────── */
-
-typedef struct {
-    char key[CBM_SZ_128];
-    char value[CBM_SZ_512];
-    char file_path[CBM_SZ_256];
-} cbm_env_binding_t;
-
-/* Scan a project directory for environment variable assignments with URL values.
- * Walks the filesystem, scans Dockerfiles, shell scripts, .env, YAML, TOML,
- * Terraform, and .properties files. Filters out secrets.
- * Returns number of bindings written to out (up to max_out).
- * NOTE: this walker currently has no production callers — it is exercised
- * only by tests. The _excluded variant honors discovery exclusions for
- * consistency with the pkgmap/path-alias walks (#792); the plain variant
- * scans unexcluded (NULL exclusion list). */
-int cbm_scan_project_env_urls(const char *root_path, cbm_env_binding_t *out, int max_out);
-int cbm_scan_project_env_urls_excluded(const char *root_path, cbm_env_binding_t *out, int max_out,
-                                       char **excluded_dirs, int excluded_count);
-
 /* ── Incremental pipeline (pipeline_incremental.c) ───────────────── */
 
 /* Run incremental re-index on an existing disk DB.
