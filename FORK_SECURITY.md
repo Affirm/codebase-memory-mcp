@@ -34,9 +34,16 @@ re-running the source-allowlist tests, and approval from the fork security
 owner.
 
 Consumers must likewise install an approved fork revision by full commit SHA.
-For a source checkout, use `git checkout --detach <approved-fork-commit-sha>`
-and verify `git rev-parse HEAD` before building or running. Do not install from
-the upstream release channels or from either repository's floating `main`.
+The current approved revision is the `approved_fork_commit` recorded in
+`FORK_LOCK.json`. For a source checkout, use:
+
+```sh
+git checkout --detach 63b00e6c29fdae675b3dc202a839983ed5003491
+test "$(git rev-parse HEAD)" = "63b00e6c29fdae675b3dc202a839983ed5003491"
+```
+
+Do not build or run if that verification fails. Do not install from the
+upstream release channels or from either repository's floating `main`.
 
 ## Owner
 
