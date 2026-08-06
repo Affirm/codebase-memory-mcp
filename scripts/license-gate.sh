@@ -90,7 +90,11 @@ trap 'rm -rf "$STAGE"' EXIT
 find vendored internal/cbm/vendored -type f \
     \( -iname 'LICENSE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' -o -iname 'UNLICENSE*' \) \
     > "$STAGE/files.txt"
-find src pkg scripts -type f \
+FIRST_PARTY_ROOTS=(src scripts)
+if [ -d pkg ]; then
+    FIRST_PARTY_ROOTS+=(pkg)
+fi
+find "${FIRST_PARTY_ROOTS[@]}" -type f \
     \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.js' \
     -o -name '*.py' -o -name '*.rb' -o -name '*.toml' -o -name '*.json' \) \
     >> "$STAGE/files.txt"

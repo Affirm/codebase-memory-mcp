@@ -17,6 +17,11 @@ if [ -d pkg ] && find pkg -type f -print -quit | grep -q .; then
 fi
 
 bash -n install.sh
+bash -n scripts/license-gate.sh
+
+if grep -Eq '^find[[:space:]]+src[[:space:]]+pkg[[:space:]]+scripts' scripts/license-gate.sh; then
+    fail "license gate still requires the removed pkg/ distribution tree"
+fi
 
 for installer in install.sh install.ps1; do
     if rg -n -i 'https?://|curl|wget|invoke-webrequest|httpclient|download_url|releases/latest' \
