@@ -1,6 +1,6 @@
 {
   "fork_repository": "pricing-side-proj/codebase-memory-mcp",
-  "approved_fork_commit": "63b00e6c29fdae675b3dc202a839983ed5003491",
+  "approved_fork_commit": "01ef52e21687eeb105c9dc32b438f681aa9bd828",
   "upstream_repository": "DeusData/codebase-memory-mcp",
   "upstream_commit": "0d6f26a1708c1e1f0e6a59867bee4bee3fe076b5",
   "security_owner": "@DanielDeng2024",
