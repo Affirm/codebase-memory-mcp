@@ -1,17 +1,17 @@
 # codebase-memory-mcp
 
-[![Managed Release](https://img.shields.io/github/v/release/pricing-side-proj/codebase-memory-mcp?style=flat&color=blue)](https://github.com/pricing-side-proj/codebase-memory-mcp/releases)
+[![Managed Release](https://img.shields.io/github/v/release/DanielDeng2024/codebase-memory-mcp?style=flat&color=blue)](https://github.com/DanielDeng2024/codebase-memory-mcp/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/pricing-side-proj/codebase-memory-mcp/dry-run.yml?label=CI)](https://github.com/pricing-side-proj/codebase-memory-mcp/actions/workflows/dry-run.yml)
-[![Tests](https://img.shields.io/badge/tests-6768_passing-brightgreen)](https://github.com/pricing-side-proj/codebase-memory-mcp)
-[![Languages](https://img.shields.io/badge/languages-158-orange)](https://github.com/pricing-side-proj/codebase-memory-mcp)
+[![CI](https://img.shields.io/github/actions/workflow/status/DanielDeng2024/codebase-memory-mcp/dry-run.yml?label=CI)](https://github.com/DanielDeng2024/codebase-memory-mcp/actions/workflows/dry-run.yml)
+[![Tests](https://img.shields.io/badge/tests-6768_passing-brightgreen)](https://github.com/DanielDeng2024/codebase-memory-mcp)
+[![Languages](https://img.shields.io/badge/languages-158-orange)](https://github.com/DanielDeng2024/codebase-memory-mcp)
 [![Hybrid LSP](https://img.shields.io/badge/Hybrid_LSP-10_languages-blue)](#hybrid-lsp)
-[![Agents](https://img.shields.io/badge/agent_surfaces-43-purple)](https://github.com/pricing-side-proj/codebase-memory-mcp)
-[![Pure C](https://img.shields.io/badge/pure_C-zero_dependencies-blue)](https://github.com/pricing-side-proj/codebase-memory-mcp)
-[![Platform](https://img.shields.io/badge/macOS_%7C_Linux_%7C_Windows-supported-lightgrey)](https://github.com/pricing-side-proj/codebase-memory-mcp/releases)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/pricing-side-proj/codebase-memory-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/pricing-side-proj/codebase-memory-mcp)
+[![Agents](https://img.shields.io/badge/agent_surfaces-43-purple)](https://github.com/DanielDeng2024/codebase-memory-mcp)
+[![Pure C](https://img.shields.io/badge/pure_C-zero_dependencies-blue)](https://github.com/DanielDeng2024/codebase-memory-mcp)
+[![Platform](https://img.shields.io/badge/macOS_%7C_Linux_%7C_Windows-supported-lightgrey)](https://github.com/DanielDeng2024/codebase-memory-mcp/releases)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/DanielDeng2024/codebase-memory-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/DanielDeng2024/codebase-memory-mcp)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-scanned_every_release-brightgreen?logo=virustotal)](https://github.com/pricing-side-proj/codebase-memory-mcp/releases)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-scanned_every_release-brightgreen?logo=virustotal)](https://github.com/DanielDeng2024/codebase-memory-mcp/releases)
 [![arXiv](https://img.shields.io/badge/arXiv-2603.27277-b31b1b?logo=arxiv)](https://arxiv.org/abs/2603.27277)
 
 **The fastest and most efficient code intelligence engine for AI coding agents.** Full-indexes an average repository in milliseconds, the Linux kernel (28M LOC, 75K files) in 3 minutes. Answers structural queries in under 1ms. Ships as a single static binary for macOS, Linux, and Windows — download, run `install`, done.
@@ -20,11 +20,11 @@ High-quality parsing through [tree-sitter](https://tree-sitter.github.io/tree-si
 
 > **Research** — The design and benchmarks behind this project are described in the preprint [*Codebase-Memory: Tree-Sitter-Based Knowledge Graphs for LLM Code Exploration via MCP*](https://arxiv.org/abs/2603.27277) (arXiv:2603.27277). Evaluated across 31 real-world repositories: 83% answer quality, 10× fewer tokens, 2.1× fewer tool calls vs. file-by-file exploration.
 
-> **Security & Trust** — This tool reads your codebase and writes to your agent configuration files. Review the [managed source](https://github.com/pricing-side-proj/codebase-memory-mcp) and [fork security policy](FORK_SECURITY.md) before use. Managed release binaries are checksummed and scanned; network installers and self-update are disabled.
+> **Security & Trust** — This tool reads your codebase and writes to your agent configuration files. Review the [managed source](https://github.com/DanielDeng2024/codebase-memory-mcp) and [fork security policy](FORK_SECURITY.md) before use. Managed release binaries are checksummed and scanned; network installers and self-update are disabled.
 
 > **Managed fork:** Do not use the upstream installation commands or a floating
 > branch against internal repositories. The approved indexing implementation is
-> commit [`01ef52e21687eeb105c9dc32b438f681aa9bd828`](https://github.com/pricing-side-proj/codebase-memory-mcp/commit/01ef52e21687eeb105c9dc32b438f681aa9bd828).
+> commit [`44a91d2e0040bd6ea93c58df2b351e09e6cda02e`](https://github.com/DanielDeng2024/codebase-memory-mcp/commit/44a91d2e0040bd6ea93c58df2b351e09e6cda02e).
 > Check out that exact SHA and follow [FORK_SECURITY.md](FORK_SECURITY.md). This
 > fork indexes only its hardcoded source-extension allowlist; all other file
 > types fail closed. [FORK_LOCK.json](FORK_LOCK.json) is the source of truth.
@@ -338,7 +338,7 @@ the reviewed release archive described above.
 </details>
 
 ```bash
-git clone https://github.com/pricing-side-proj/codebase-memory-mcp.git
+git clone https://github.com/DanielDeng2024/codebase-memory-mcp.git
 cd codebase-memory-mcp
 git checkout --detach "$(jq -r .approved_fork_commit FORK_LOCK.json)"
 test "$(git rev-parse HEAD)" = "$(jq -r .approved_fork_commit FORK_LOCK.json)"
@@ -756,7 +756,7 @@ internal/cbm/         Vendored tree-sitter grammars (158 languages) + AST extrac
 Every release binary is verified through a multi-layer pipeline before publication:
 
 - **VirusTotal** — all binaries scanned by 70+ antivirus engines (zero detections required to publish)
-- **SLSA provenance** — cryptographic build provenance generated by the managed GitHub Actions build workflow; verify with `gh attestation verify <file> --repo pricing-side-proj/codebase-memory-mcp --signer-workflow pricing-side-proj/codebase-memory-mcp/.github/workflows/_build.yml`
+- **SLSA provenance** — cryptographic build provenance generated by the managed GitHub Actions build workflow; verify with `gh attestation verify <file> --repo DanielDeng2024/codebase-memory-mcp --signer-workflow DanielDeng2024/codebase-memory-mcp/.github/workflows/_build.yml`
 - **Sigstore cosign** — keyless signatures on all artifacts; bundles included in every release
 - **SHA-256 checksums** — `checksums.txt` published with every release; verified by both install scripts before extraction
 - **CodeQL SAST** — blocks release pipeline if any open alerts remain

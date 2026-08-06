@@ -2,7 +2,7 @@
 
 ## Managed Fork Security Ownership
 
-The managed fork at `pricing-side-proj/codebase-memory-mcp` is owned by
+The managed fork at `DanielDeng2024/codebase-memory-mcp` is owned by
 `@DanielDeng2024`. The fork owner is accountable for:
 
 - reviewing and merging applicable upstream security patches;

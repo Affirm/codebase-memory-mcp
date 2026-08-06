@@ -32,7 +32,7 @@ sbom = {
     "dataLicense": "CC0-1.0",
     "SPDXID": "SPDXRef-DOCUMENT",
     "name": f"codebase-memory-mcp-{version}",
-    "documentNamespace": f"https://github.com/pricing-side-proj/codebase-memory-mcp/releases/{version}",
+    "documentNamespace": f"https://github.com/DanielDeng2024/codebase-memory-mcp/releases/{version}",
     "creationInfo": {
         "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "creators": ["Tool: codebase-memory-mcp-release-pipeline"],

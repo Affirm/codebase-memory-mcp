@@ -38,8 +38,8 @@ The current approved revision is the `approved_fork_commit` recorded in
 `FORK_LOCK.json`. For a source checkout, use:
 
 ```sh
-git checkout --detach 01ef52e21687eeb105c9dc32b438f681aa9bd828
-test "$(git rev-parse HEAD)" = "01ef52e21687eeb105c9dc32b438f681aa9bd828"
+git checkout --detach 44a91d2e0040bd6ea93c58df2b351e09e6cda02e
+test "$(git rev-parse HEAD)" = "44a91d2e0040bd6ea93c58df2b351e09e6cda02e"
 ```
 
 Do not build or run if that verification fails. Do not install from the
