@@ -6895,8 +6895,7 @@ static int verify_download_checksum(const char *archive_path, const char *archiv
         cbm_unlink(checksum_file);
         return CLI_ERR;
     }
-    checksum_url_length =
-        snprintf(checksum_url, sizeof(checksum_url), "%s/checksums.txt", dl_base);
+    checksum_url_length = snprintf(checksum_url, sizeof(checksum_url), "%s/checksums.txt", dl_base);
     if (checksum_url_length <= 0 || (size_t)checksum_url_length >= sizeof(checksum_url)) {
         cbm_unlink(checksum_file);
         return CLI_ERR;
@@ -11297,9 +11296,8 @@ int cbm_cmd_update(int argc, char **argv) {
     (void)dry_run;
     (void)force;
     (void)variant_flag;
-    (void)fprintf(stderr,
-                  "error: self-update is disabled in this managed build; install an exact "
-                  "approved release artifact through the managed distribution channel\n");
+    (void)fprintf(stderr, "error: self-update is disabled in this managed build; install an exact "
+                          "approved release artifact through the managed distribution channel\n");
     return CLI_TRUE;
 #else
     if (!g_cli_activation_test_ops_set) {

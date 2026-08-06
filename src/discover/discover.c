@@ -128,11 +128,10 @@ static const char *SOURCE_EXTENSIONS[] = {
     /* Source-module variants of the primary languages */
     ".cts", ".mts", ".cjs", ".mjs", ".jsx", ".kts",
     /* Other conventional compiled/application source used in the monorepos */
-    ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".cs",
-    ".php", ".rb", ".rs", ".scala", ".swift",
+    ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".cs", ".php", ".rb", ".rs", ".scala",
+    ".swift",
     /* Interface-definition source */
-    ".proto",
-    NULL};
+    ".proto", NULL};
 
 /* ── Helper: check if string is in NULL-terminated array ─────────── */
 
