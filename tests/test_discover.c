@@ -295,6 +295,73 @@ TEST(pattern_dts_full) {
     PASS();
 }
 
+/* ── Managed source-extension security boundary ──────────────── */
+
+TEST(source_allowlist_accepts_approved_extensions) {
+    ASSERT_TRUE(cbm_is_source_extension_allowed("service.py"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("service.ts"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("Service.java"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("service.go"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("Service.kt"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("service.js"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("Service.tsx"));
+    ASSERT_TRUE(cbm_is_source_extension_allowed("schema.proto"));
+    PASS();
+}
+
+TEST(source_allowlist_rejects_non_source_and_unknown_extensions) {
+    ASSERT_FALSE(cbm_is_source_extension_allowed(".env"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("README.md"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("config.json"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("deploy.yaml"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("settings.toml"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("query.sql"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("private.pem"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("Dockerfile"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("script.PY"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed("custom.cbmfixture"));
+    ASSERT_FALSE(cbm_is_source_extension_allowed(NULL));
+    PASS();
+}
+
+TEST(discover_source_allowlist_fails_closed) {
+    char *base = th_mktempdir("cbm_disc_source_allowlist");
+    ASSERT(base != NULL);
+
+    th_write_file(TH_PATH(base, "src/app.py"), "print('source')\n");
+    th_write_file(TH_PATH(base, "src/App.tsx"), "export const App = () => null;\n");
+    th_write_file(TH_PATH(base, ".env"), "ANTHROPIC_API_KEY=must-not-index\n");
+    th_write_file(TH_PATH(base, "README.md"), "must-not-index\n");
+    th_write_file(TH_PATH(base, "config.json"), "{\"secret\":\"must-not-index\"}\n");
+    th_write_file(TH_PATH(base, "deploy.yaml"), "secret: must-not-index\n");
+    th_write_file(TH_PATH(base, "query.sql"), "select 'must-not-index';\n");
+    th_write_file(TH_PATH(base, "custom.cbmfixture"), "must-not-index\n");
+
+    cbm_discover_opts_t opts = {.mode = CBM_MODE_FULL};
+    cbm_file_info_t *files = NULL;
+    int count = 0;
+    cbm_ignored_file_t *ignored = NULL;
+    int ignored_count = 0;
+    int ignored_total = 0;
+
+    int rc = cbm_discover_ex2(base, &opts, &files, &count, NULL, NULL, &ignored,
+                              &ignored_count, &ignored_total);
+    ASSERT_EQ(rc, 0);
+    ASSERT_EQ(count, 2);
+    ASSERT_TRUE(discover_has_rel_path(files, count, "src/app.py"));
+    ASSERT_TRUE(discover_has_rel_path(files, count, "src/App.tsx"));
+    ASSERT_EQ(ignored_count, 6);
+    ASSERT_EQ(ignored_total, 6);
+    for (int i = 0; i < ignored_count; i++) {
+        ASSERT_STR_EQ(ignored[i].reason, "source-extension-not-allowlisted");
+    }
+
+    cbm_discover_free_ignored(ignored, ignored_count);
+    cbm_discover_free(files, count);
+    th_cleanup(base);
+    PASS();
+}
+
 /* ── File discovery (integration) — cross-platform via test_helpers.h ── */
 
 TEST(discover_simple) {
@@ -1426,6 +1493,11 @@ SUITE(discover) {
     RUN_TEST(pattern_spec);
     RUN_TEST(pattern_stories);
     RUN_TEST(pattern_dts_full);
+
+    /* Managed source-extension security boundary */
+    RUN_TEST(source_allowlist_accepts_approved_extensions);
+    RUN_TEST(source_allowlist_rejects_non_source_and_unknown_extensions);
+    RUN_TEST(discover_source_allowlist_fails_closed);
 
     /* Integration tests (cross-platform) */
     RUN_TEST(discover_simple);

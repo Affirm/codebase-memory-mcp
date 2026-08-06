@@ -91,7 +91,9 @@ TEST(userconfig_global_via_env) {
 #endif
 
     ASSERT_NOT_NULL(cfg);
-    ASSERT_EQ(cbm_userconfig_lookup(cfg, ".twig"), CBM_LANG_HTML);
+    /* The managed fork rejects custom mappings whose final extension is not in
+     * the source allowlist. */
+    ASSERT_EQ(cbm_userconfig_lookup(cfg, ".twig"), CBM_LANG_COUNT);
 
     cbm_userconfig_free(cfg);
     remove(global_path);
@@ -130,8 +132,8 @@ TEST(userconfig_project_wins_over_global) {
     cbm_unsetenv("XDG_CONFIG_HOME");
 
     ASSERT_NOT_NULL(cfg);
-    /* Project definition (rust) must win */
-    ASSERT_EQ(cbm_userconfig_lookup(cfg, ".xyz"), CBM_LANG_RUST);
+    /* A project config cannot expand the non-configurable source allowlist. */
+    ASSERT_EQ(cbm_userconfig_lookup(cfg, ".xyz"), CBM_LANG_COUNT);
 
     cbm_userconfig_free(cfg);
     remove(global_path);

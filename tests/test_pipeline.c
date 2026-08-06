@@ -6886,7 +6886,9 @@ TEST(pipeline_global_extension_config_change_forces_full) {
 
     ASSERT_EQ(setenv_rc, 0);
     ASSERT_EQ(baseline_rc, 0);
-    ASSERT_EQ(initial_nodes, 1);
+    /* .cbmfixture is outside the managed source allowlist, so custom extension
+     * config cannot cause its contents to be indexed. */
+    ASSERT_EQ(initial_nodes, 0);
     ASSERT_EQ(changed_rc, 0);
     ASSERT_EQ(changed_route, CBM_INCREMENTAL_ROUTE_FORCED_FULL);
     ASSERT_EQ(changed_nodes, 0);
@@ -9448,13 +9450,13 @@ TEST(pkgmap_scan_repo_honors_discovery_exclusions) {
     write_temp_file(tmpdir, "vendor_big/lib/package.json",
                     "{\"name\":\"@org/vendored\",\"main\":\"index.js\"}\n");
 
-    /* Control: NULL exclusion list — the walk reaches and parses BOTH
-     * manifests (proves the excluded one is reachable + parseable). */
+    /* package.json is not an approved source extension, so the repo-wide
+     * enrichment walk must not read either manifest. */
     cbm_pkg_entries_t control;
     cbm_pkg_entries_init(&control);
     cbm_pkgmap_scan_repo(tmpdir, &control, NULL, 0);
-    ASSERT_TRUE(pkg_entries_has_name(&control, "@org/app"));
-    ASSERT_TRUE(pkg_entries_has_name(&control, "@org/vendored"));
+    ASSERT_FALSE(pkg_entries_has_name(&control, "@org/app"));
+    ASSERT_FALSE(pkg_entries_has_name(&control, "@org/vendored"));
     cbm_pkg_entries_free(&control);
 
     /* With vendor_big excluded (as discovery reports for a gitignored
@@ -9463,7 +9465,7 @@ TEST(pkgmap_scan_repo_honors_discovery_exclusions) {
     cbm_pkg_entries_t entries;
     cbm_pkg_entries_init(&entries);
     cbm_pkgmap_scan_repo(tmpdir, &entries, excluded, 1);
-    ASSERT_TRUE(pkg_entries_has_name(&entries, "@org/app"));
+    ASSERT_FALSE(pkg_entries_has_name(&entries, "@org/app"));
     ASSERT_FALSE(pkg_entries_has_name(&entries, "@org/vendored"));
     cbm_pkg_entries_free(&entries);
 

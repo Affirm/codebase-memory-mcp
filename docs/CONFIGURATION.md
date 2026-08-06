@@ -61,6 +61,9 @@ Notes:
 - Unknown language names are skipped.
 - Missing files are ignored.
 - If the same extension appears in both files, the per-project file wins.
+- **Managed fork:** `extra_extensions` cannot expand the source-code security
+  allowlist. A configured mapping is effective only when the filename's final
+  extension is already approved by `cbm_is_source_extension_allowed()`.
 
 ## 2. CLI-Managed Runtime Settings
 

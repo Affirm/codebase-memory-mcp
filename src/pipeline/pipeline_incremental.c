@@ -379,8 +379,9 @@ static int semantic_manifest_walk_controls(semantic_manifest_builder_t *builder,
         bool root_control =
             (!rel_dir || !rel_dir[0]) &&
             (strcmp(name, ".cbmignore") == 0 || strcmp(name, ".codebase-memory.json") == 0);
-        if (path_info.is_regular && (strcmp(name, ".gitignore") == 0 || root_control ||
-                                     semantic_manifest_package_control(name))) {
+        if (path_info.is_regular && cbm_is_source_extension_allowed(name) &&
+            (strcmp(name, ".gitignore") == 0 || root_control ||
+             semantic_manifest_package_control(name))) {
             rc = semantic_manifest_add(builder, project, rel_path, abs_path);
         }
     }

@@ -33,6 +33,11 @@
 
 /* Read an entire file into a malloc'd buffer. Returns NULL on failure. */
 static char *pkgmap_read_file(const char *path, int *out_len) {
+    /* Managed fork: package-map enrichment must not bypass the source-only
+     * discovery boundary by opening JSON/YAML/TOML/XML manifests directly. */
+    if (!cbm_is_source_extension_allowed(path)) {
+        return NULL;
+    }
     FILE *f = cbm_fopen(path, "rb");
     if (!f) {
         return NULL;

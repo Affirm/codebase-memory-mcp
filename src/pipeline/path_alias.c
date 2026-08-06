@@ -21,6 +21,7 @@
 #include "pipeline/path_alias.h"
 
 #include "pipeline/pipeline_internal.h"
+#include "discover/discover.h"
 
 #include "foundation/compat.h"
 #include "foundation/compat_fs.h"
@@ -172,6 +173,11 @@ static int cmp_scope_by_specificity(const void *a, const void *b) {
  * (e.g. "apps/manager", or "" for repo root). Returns NULL if the file is
  * missing, malformed, or has neither a usable paths block nor a baseUrl. */
 static cbm_path_alias_map_t *load_tsconfig_file(const char *abs_path, const char *dir_prefix) {
+    /* Managed fork: tsconfig/jsconfig are not approved source extensions. Alias
+     * enrichment may not open them outside the main discovery path. */
+    if (!cbm_is_source_extension_allowed(abs_path)) {
+        return NULL;
+    }
     FILE *f = cbm_fopen(abs_path, "r");
     if (!f) {
         return NULL;

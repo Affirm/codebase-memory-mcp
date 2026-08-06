@@ -22,6 +22,11 @@ High-quality parsing through [tree-sitter](https://tree-sitter.github.io/tree-si
 
 > **Security & Trust** — This tool reads your codebase and writes to your agent configuration files. That is what it is designed to do. If you prefer to audit before running, the [full source is here](https://github.com/DeusData/codebase-memory-mcp) — every release binary is signed, checksummed, and scanned by 70+ antivirus engines. All processing happens 100% locally; your code never leaves your machine. Found a security issue? We want to know — see [SECURITY.md](SECURITY.md). Security is Priority #1 for us.
 
+> **Managed fork:** Do not use the upstream installation commands or a floating
+> branch against internal repositories. Use an approved full commit SHA from
+> this fork and follow [FORK_SECURITY.md](FORK_SECURITY.md). This fork indexes only its
+> hardcoded source-extension allowlist; all other file types fail closed.
+
 <p align="center">
   <img src="docs/graph-ui-screenshot.png" alt="Graph visualization UI showing the codebase-memory-mcp knowledge graph" width="800">
   <br>

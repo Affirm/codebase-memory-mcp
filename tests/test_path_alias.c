@@ -252,29 +252,10 @@ TEST(path_alias_loader_monorepo) {
                          "    \"paths\": {\n      \"@/*\": [\"./src/*\"]\n    }\n  },\n}\n"),
               0);
 
+    /* tsconfig.json is not source code. The managed fork must not read it to
+     * enrich the graph, even when it contains otherwise valid aliases. */
     cbm_path_alias_collection_t *coll = cbm_load_path_aliases(root);
-    ASSERT_NOT_NULL(coll);
-    ASSERT_EQ(coll->count, 2);
-
-    /* sub-package file picks up its own tsconfig. */
-    const cbm_path_alias_map_t *m =
-        cbm_path_alias_find_for_file(coll, "apps/manager/src/feature/x.ts");
-    ASSERT_NOT_NULL(m);
-    char *r = cbm_path_alias_resolve(m, "@/lib/auth");
-    ASSERT_NOT_NULL(r);
-    /* Target paths in the sub-tsconfig are dir_prefix-relative. */
-    ASSERT_STR_EQ(r, "apps/manager/src/lib/auth");
-    free(r);
-
-    /* Root file falls back to the root tsconfig's aliases. */
-    const cbm_path_alias_map_t *m2 = cbm_path_alias_find_for_file(coll, "scripts/build.ts");
-    ASSERT_NOT_NULL(m2);
-    char *r2 = cbm_path_alias_resolve(m2, "@root/utils");
-    ASSERT_NOT_NULL(r2);
-    ASSERT_STR_EQ(r2, "shared/utils");
-    free(r2);
-
-    cbm_path_alias_collection_free(coll);
+    ASSERT_NULL(coll);
 
     /* Cleanup tmp tree. */
     snprintf(path, sizeof(path), "%s/apps/manager/tsconfig.json", root);
@@ -312,19 +293,7 @@ TEST(path_alias_loader_monorepo_dotdot_climb) {
               0);
 
     cbm_path_alias_collection_t *coll = cbm_load_path_aliases(root);
-    ASSERT_NOT_NULL(coll);
-
-    const cbm_path_alias_map_t *m =
-        cbm_path_alias_find_for_file(coll, "apps/web/src/feature/x.ts");
-    ASSERT_NOT_NULL(m);
-    char *r = cbm_path_alias_resolve(m, "@shared/utils");
-    ASSERT_NOT_NULL(r);
-    /* "../.." from apps/web climbs to repo root, then descends into
-     * packages/shared/src — not the literal (unmatchable) "apps/web/../../..." */
-    ASSERT_STR_EQ(r, "packages/shared/src/utils");
-    free(r);
-
-    cbm_path_alias_collection_free(coll);
+    ASSERT_NULL(coll);
 
     snprintf(path, sizeof(path), "%s/apps/web/tsconfig.json", root);
     unlink(path);
@@ -363,24 +332,14 @@ TEST(path_alias_loader_honors_discovery_exclusions) {
                          "      \"@gen/*\": [\"./src/*\"]\n    }\n  }\n}\n"),
               0);
 
-    /* Control: the unexcluded loader collects BOTH configs. */
+    /* Both configs are disallowed independently of discovery exclusions. */
     cbm_path_alias_collection_t *coll = cbm_load_path_aliases(root);
-    ASSERT_NOT_NULL(coll);
-    ASSERT_EQ(coll->count, 2);
-    cbm_path_alias_collection_free(coll);
+    ASSERT_NULL(coll);
 
     /* Excluding big_generated drops its config; the root one survives. */
     char *excluded[] = {(char *)"big_generated"};
     coll = cbm_load_path_aliases_excluded(root, excluded, 1);
-    ASSERT_NOT_NULL(coll);
-    ASSERT_EQ(coll->count, 1);
-    const cbm_path_alias_map_t *m = cbm_path_alias_find_for_file(coll, "src/x.ts");
-    ASSERT_NOT_NULL(m);
-    char *r = cbm_path_alias_resolve(m, "@root/utils");
-    ASSERT_NOT_NULL(r);
-    ASSERT_STR_EQ(r, "shared/utils");
-    free(r);
-    cbm_path_alias_collection_free(coll);
+    ASSERT_NULL(coll);
 
     snprintf(path, sizeof(path), "%s/big_generated/tsconfig.json", root);
     unlink(path);

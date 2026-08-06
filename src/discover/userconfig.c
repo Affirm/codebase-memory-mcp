@@ -10,6 +10,7 @@
  * skipped (fail-open). Missing files are silently ignored.
  */
 #include "discover/userconfig.h"
+#include "discover/discover.h"
 #include "cbm.h" /* CBMLanguage, CBM_LANG_* */
 #include "foundation/constants.h"
 #include "foundation/platform.h" /* cbm_safe_getenv */
@@ -220,6 +221,10 @@ static int parse_extra_extensions(yyjson_val *root, cbm_userext_t **entries, int
         /* Extension must start with '.' */
         if (ext_str[0] != '.') {
             cbm_log_warn("userconfig.skip_bad_ext", "file", source_label, "ext", ext_str);
+            continue;
+        }
+        if (!cbm_is_source_extension_allowed(ext_str)) {
+            cbm_log_warn("userconfig.skip_disallowed_ext", "file", source_label, "ext", ext_str);
             continue;
         }
 

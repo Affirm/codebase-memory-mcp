@@ -107,6 +107,11 @@ bool cbm_should_skip_filename(const char *filename, cbm_index_mode_t mode);
 /* Check if a path matches fast-mode substring patterns (e.g. .d.ts, .pb.go). */
 bool cbm_matches_fast_pattern(const char *filename, cbm_index_mode_t mode);
 
+/* Managed fork security boundary. Returns true only when filename's final,
+ * case-sensitive extension is in the non-configurable source-code allowlist.
+ * Extensionless files and user-configured extra extensions fail closed. */
+bool cbm_is_source_extension_allowed(const char *filename);
+
 /* ── File discovery ──────────────────────────────────────────────── */
 
 typedef struct {
@@ -162,7 +167,8 @@ int cbm_discover_ex(const char *repo_path, const cbm_discover_opts_t *opts, cbm_
  * failure. */
 typedef struct {
     char *rel_path; /* heap-allocated, relative to repo root */
-    char *reason;   /* heap-allocated: "gitignore" | "cbmignore" |
+    char *reason;   /* heap-allocated: "source-extension-not-allowlisted" |
+                     * "gitignore" | "cbmignore" |
                      * "skip-list" | "ignored-suffix" | "fast-pattern" |
                      * "size-cap" */
 } cbm_ignored_file_t;

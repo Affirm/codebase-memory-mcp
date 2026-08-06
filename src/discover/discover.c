@@ -2,11 +2,12 @@
  * discover.c — Recursive directory walk with filtering.
  *
  * Walks a repository directory tree, applying:
- *   1. Hardcoded directory skip patterns (60+ dirs like .git, node_modules)
- *   2. Hardcoded suffix filters (.pyc, .png, .wasm, etc.)
- *   3. Fast-mode additional filters (docs, examples, lock files, etc.)
- *   4. Gitignore-style pattern matching
- *   5. Language detection for accepted files
+ *   1. Managed source-extension allowlist (fail closed)
+ *   2. Hardcoded directory skip patterns (60+ dirs like .git, node_modules)
+ *   3. Hardcoded suffix filters (.pyc, .png, .wasm, etc.)
+ *   4. Fast-mode additional filters (docs, examples, lock files, etc.)
+ *   5. Gitignore-style pattern matching
+ *   6. Language detection for accepted files
  */
 #include "discover/discover.h"
 #include "cbm.h" // CBMLanguage, CBM_LANG_COUNT, CBM_LANG_JSON
@@ -107,6 +108,32 @@ static const char *IGNORED_JSON_FILES[] = {
     ".devcontainer.json", "launch.json",       "settings.json",
     "extensions.json",    "tasks.json",        NULL};
 
+/* ── Managed source-only security boundary ────────────────────── */
+
+/*
+ * This fork is approved for internal repositories only with a fail-closed file
+ * allowlist. Keep this list intentionally small: every extension added here
+ * expands the set of file contents that an MCP client can place in an LLM
+ * request. Configuration, documentation, data, credential, infrastructure,
+ * shell, and extensionless files are excluded by default even when the
+ * upstream language registry has a grammar for them.
+ *
+ * This check is deliberately independent of cbm_language_for_filename() and
+ * user-configured extra_extensions. Neither .cbmignore negation nor extension
+ * configuration may widen this security boundary.
+ */
+static const char *SOURCE_EXTENSIONS[] = {
+    /* Primary application languages */
+    ".py", ".ts", ".tsx", ".java", ".kt", ".go", ".js",
+    /* Source-module variants of the primary languages */
+    ".cts", ".mts", ".cjs", ".mjs", ".jsx", ".kts",
+    /* Other conventional compiled/application source used in the monorepos */
+    ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".cs",
+    ".php", ".rb", ".rs", ".scala", ".swift",
+    /* Interface-definition source */
+    ".proto",
+    NULL};
+
 /* ── Helper: check if string is in NULL-terminated array ─────────── */
 
 static bool str_in_list(const char *s, const char *const *list) {
@@ -127,6 +154,14 @@ static bool ends_with(const char *s, const char *suffix) {
         return false;
     }
     return strcmp(s + slen - sufflen, suffix) == 0;
+}
+
+bool cbm_is_source_extension_allowed(const char *filename) {
+    if (!filename) {
+        return false;
+    }
+    const char *dot = strrchr(filename, '.');
+    return dot && str_in_list(dot, SOURCE_EXTENSIONS);
 }
 
 /* ── Helper: check if string contains substring ───────────── */
@@ -613,6 +648,12 @@ static const char *file_skip_reason(const char *entry_name, const char *rel_path
                                     const cbm_gitignore_t *local_gi, const char *local_gi_prefix,
                                     off_t file_size) {
     cbm_index_mode_t mode = opts ? opts->mode : CBM_MODE_FULL;
+    /* Non-negatable and evaluated before every configurable ignore mechanism:
+     * an unknown or non-source extension must never reach language detection
+     * or a content-based disambiguator. */
+    if (!cbm_is_source_extension_allowed(entry_name)) {
+        return "source-extension-not-allowlisted";
+    }
     if (cbm_has_ignored_suffix(entry_name, mode)) {
         return "ignored-suffix";
     }

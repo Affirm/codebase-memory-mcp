@@ -1,5 +1,19 @@
 # Maintainers
 
+## Managed Fork Security Ownership
+
+The managed fork at `pricing-side-proj/codebase-memory-mcp` is owned by
+`@DanielDeng2024`. The fork owner is accountable for:
+
+- reviewing and merging applicable upstream security patches;
+- reviewing every expansion of the source-extension allowlist;
+- updating `FORK_LOCK.json` when the reviewed upstream base changes; and
+- ensuring internal installations use a full commit SHA, never `main`, another
+  branch name, or a moving release alias.
+
+This assignment governs the managed fork. The upstream authority model below
+continues to describe `DeusData/codebase-memory-mcp`.
+
 This document defines how maintainer responsibility, review routing, and
 operational authority work in this project.
 
