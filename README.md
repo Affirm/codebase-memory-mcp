@@ -24,7 +24,7 @@ High-quality parsing through [tree-sitter](https://tree-sitter.github.io/tree-si
 
 > **Managed fork:** Do not use the upstream installation commands or a floating
 > branch against internal repositories. The approved indexing implementation is
-> commit [`40efc1d12feeac9355d949a44f0b9bd6be7aa9f5`](https://github.com/DanielDeng2024/codebase-memory-mcp/commit/40efc1d12feeac9355d949a44f0b9bd6be7aa9f5).
+> commit [`18a06181a7e6f1d9fa2715a16a1f55592838d759`](https://github.com/DanielDeng2024/codebase-memory-mcp/commit/18a06181a7e6f1d9fa2715a16a1f55592838d759).
 > Check out that exact SHA and follow [FORK_SECURITY.md](FORK_SECURITY.md). This
 > fork indexes only its hardcoded source-extension allowlist; all other file
 > types fail closed. [FORK_LOCK.json](FORK_LOCK.json) is the source of truth.
