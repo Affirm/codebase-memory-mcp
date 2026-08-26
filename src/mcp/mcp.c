@@ -3486,6 +3486,68 @@ static void emit_semantic_results_toon(cbm_sb_t *sb, const cbm_vector_result_t *
     }
 }
 
+/* Labels commonly confused for one another: a JDBI/interface method, for
+ * example, registers as Method rather than Function, so a label:"Function"
+ * search comes back a clean, plausible-looking zero -- indistinguishable
+ * from "does not exist" unless something points at the sibling label that
+ * actually holds it. Kept to the one pair callers actually hit; extend only
+ * once a second real confusion turns up. */
+static const char *sg_sibling_label(const char *label) {
+    if (!label) {
+        return NULL;
+    }
+    if (strcmp(label, "Function") == 0) {
+        return "Method";
+    }
+    if (strcmp(label, "Method") == 0) {
+        return "Function";
+    }
+    return NULL;
+}
+
+/* Cheap existence probe: same filters as `base` but with the label swapped
+ * to `sibling_label`, capped at one row -- just enough to know whether the
+ * pattern the caller searched for exists under the sibling label. */
+static bool sg_sibling_label_has_hits(cbm_store_t *store, const cbm_search_params_t *base,
+                                      const char *sibling_label) {
+    cbm_search_params_t probe = *base;
+    probe.label = sibling_label;
+    probe.limit = 1;
+    probe.offset = 0;
+    cbm_search_output_t probe_out = {0};
+    bool found = cbm_store_search(store, &probe, &probe_out) == CBM_STORE_OK && probe_out.total > 0;
+    cbm_store_search_free(&probe_out);
+    return found;
+}
+
+/* Builds the zero-results hint for search_graph into `buf` (bounded, always
+ * NUL-terminated; empty when no filter warrants a hint). Checks the
+ * sibling-label footgun first, since the existing generic messages below are
+ * actively misleading in that case, then falls back to them unchanged. */
+static void sg_build_zero_result_hint(cbm_store_t *store, const cbm_search_params_t *params,
+                                      const char *name_pattern, char *buf, size_t bufsz) {
+    const char *label = params->label;
+    const char *sibling = sg_sibling_label(label);
+    if (sibling && sg_sibling_label_has_hits(store, params, sibling)) {
+        snprintf(buf, bufsz,
+                 "No nodes with label \"%s\" match, but this pattern DOES match under label "
+                 "\"%s\" -- retry with label:\"%s\" (or drop the label filter).",
+                 label, sibling, sibling);
+    } else if (name_pattern && label) {
+        snprintf(buf, bufsz,
+                 "No results. Try removing the label filter or broadening the name_pattern regex.");
+    } else if (name_pattern) {
+        snprintf(buf, bufsz,
+                 "No nodes match this pattern. Check spelling or try a broader regex.");
+    } else if (label) {
+        snprintf(buf, bufsz,
+                 "No nodes with this label. Available labels: Function, Method, Class, "
+                 "Interface, Route, Variable, Module, Package, File, Folder.");
+    } else {
+        buf[0] = '\0';
+    }
+}
+
 static char *handle_search_graph(cbm_mcp_server_t *srv, const char *args) {
     /* Inner phase split: every tool leaks the same ~4 MB per request, so the
      * retainer is in what the handlers share -- store resolution or the query
@@ -3613,19 +3675,11 @@ static char *handle_search_graph(cbm_mcp_server_t *srv, const char *args) {
                         "columns like complexity, cognitive, signature");
                 }
                 if (tout.total == 0) {
-                    if (name_pattern && label) {
-                        cbm_tree_scalar_str(&sb, "hint",
-                                            "No results. Try removing the label filter or "
-                                            "broadening the name_pattern regex.");
-                    } else if (name_pattern) {
-                        cbm_tree_scalar_str(
-                            &sb, "hint",
-                            "No nodes match this pattern. Check spelling or try a broader regex.");
-                    } else if (label) {
-                        cbm_tree_scalar_str(&sb, "hint",
-                                            "No nodes with this label. Available labels: "
-                                            "Function, Method, Class, Interface, Route, "
-                                            "Variable, Module, Package, File, Folder.");
+                    char zero_hint[256];
+                    sg_build_zero_result_hint(store, &params, name_pattern, zero_hint,
+                                              sizeof(zero_hint));
+                    if (zero_hint[0]) {
+                        cbm_tree_scalar_str(&sb, "hint", zero_hint);
                     }
                 }
             }
@@ -3698,19 +3752,10 @@ static char *handle_search_graph(cbm_mcp_server_t *srv, const char *args) {
 
     /* Add diagnostic hint when zero results */
     if (out.total == 0) {
-        if (name_pattern && label) {
-            yyjson_mut_obj_add_str(
-                doc, root, "hint",
-                "No results. Try removing the label filter or broadening the name_pattern regex.");
-        } else if (name_pattern) {
-            yyjson_mut_obj_add_str(
-                doc, root, "hint",
-                "No nodes match this pattern. Check spelling or try a broader regex.");
-        } else if (label) {
-            yyjson_mut_obj_add_str(
-                doc, root, "hint",
-                "No nodes with this label. Available labels: Function, Method, Class, "
-                "Interface, Route, Variable, Module, Package, File, Folder.");
+        char zero_hint[256];
+        sg_build_zero_result_hint(store, &params, name_pattern, zero_hint, sizeof(zero_hint));
+        if (zero_hint[0]) {
+            yyjson_mut_obj_add_strcpy(doc, root, "hint", zero_hint);
         }
     }
 
