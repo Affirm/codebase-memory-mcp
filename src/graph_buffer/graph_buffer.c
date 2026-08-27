@@ -636,6 +636,76 @@ void cbm_gbuf_set_next_id(cbm_gbuf_t *gb, int64_t next_id) {
 
 /* ── Node operations ─────────────────────────────────────────────── */
 
+/* Fold a losing method/function definition into the surviving node's
+ * properties_json as a "sibling_overloads" entry instead of letting
+ * cbm_gbuf_upsert_node's same-QN tie-break discard it outright. Overloaded
+ * methods (JDBI @SqlQuery DAOs, C++ overloads, Python @overload, ...)
+ * legitimately share one qualified_name in a name-only-resolved graph, so a
+ * name/type/annotation surviving on the node beats it vanishing with no
+ * trace. If the loser itself already carries a "sibling_overloads" array
+ * (it was the survivor of an earlier collision), those entries are flattened
+ * into the result rather than nested, so the array always lists actual
+ * siblings, never a merge tree. Returns a newly yyjson_mut_write-allocated
+ * string the caller must free(), or NULL if winner_props fails to parse as a
+ * JSON object (caller should leave properties_json unchanged in that case). */
+static char *gb_stash_sibling_overload(const char *winner_props, const char *loser_name,
+                                       const char *loser_qn, const char *loser_file_path,
+                                       int loser_start_line, int loser_end_line,
+                                       const char *loser_props) {
+    yyjson_doc *wdoc = winner_props ? yyjson_read(winner_props, strlen(winner_props), 0) : NULL;
+    yyjson_val *wroot = wdoc ? yyjson_doc_get_root(wdoc) : NULL;
+
+    yyjson_mut_doc *mdoc = yyjson_mut_doc_new(NULL);
+    yyjson_mut_val *mroot =
+        (wroot && yyjson_is_obj(wroot)) ? yyjson_val_mut_copy(mdoc, wroot) : yyjson_mut_obj(mdoc);
+    if (!mroot) {
+        yyjson_mut_doc_free(mdoc);
+        yyjson_doc_free(wdoc);
+        return NULL;
+    }
+    yyjson_mut_doc_set_root(mdoc, mroot);
+
+    yyjson_mut_val *arr = yyjson_mut_obj_get(mroot, "sibling_overloads");
+    if (!arr || !yyjson_mut_is_arr(arr)) {
+        arr = yyjson_mut_arr(mdoc);
+        yyjson_mut_obj_remove_key(mroot, "sibling_overloads");
+        yyjson_mut_obj_add_val(mdoc, mroot, "sibling_overloads", arr);
+    }
+
+    yyjson_doc *ldoc = loser_props ? yyjson_read(loser_props, strlen(loser_props), 0) : NULL;
+    yyjson_val *lroot = ldoc ? yyjson_doc_get_root(ldoc) : NULL;
+    yyjson_val *l_nested =
+        (lroot && yyjson_is_obj(lroot)) ? yyjson_obj_get(lroot, "sibling_overloads") : NULL;
+
+    yyjson_mut_val *entry = yyjson_mut_obj(mdoc);
+    yyjson_mut_obj_add_strcpy(mdoc, entry, "name", loser_name ? loser_name : "");
+    yyjson_mut_obj_add_strcpy(mdoc, entry, "qualified_name", loser_qn ? loser_qn : "");
+    yyjson_mut_obj_add_strcpy(mdoc, entry, "file_path", loser_file_path ? loser_file_path : "");
+    yyjson_mut_obj_add_int(mdoc, entry, "start_line", loser_start_line);
+    yyjson_mut_obj_add_int(mdoc, entry, "end_line", loser_end_line);
+    if (lroot && yyjson_is_obj(lroot)) {
+        yyjson_mut_val *props_copy = yyjson_val_mut_copy(mdoc, lroot);
+        yyjson_mut_obj_remove_key(props_copy, "sibling_overloads");
+        yyjson_mut_obj_add_val(mdoc, entry, "properties", props_copy);
+    }
+    yyjson_mut_arr_add_val(arr, entry);
+
+    if (l_nested && yyjson_is_arr(l_nested)) {
+        yyjson_arr_iter iter;
+        yyjson_arr_iter_init(l_nested, &iter);
+        yyjson_val *item;
+        while ((item = yyjson_arr_iter_next(&iter))) {
+            yyjson_mut_arr_add_val(arr, yyjson_val_mut_copy(mdoc, item));
+        }
+    }
+
+    char *result = yyjson_mut_write(mdoc, 0, NULL);
+    yyjson_mut_doc_free(mdoc);
+    yyjson_doc_free(ldoc);
+    yyjson_doc_free(wdoc);
+    return result;
+}
+
 int64_t cbm_gbuf_upsert_node(cbm_gbuf_t *gb, const char *label, const char *name,
                              const char *qualified_name, const char *file_path, int start_line,
                              int end_line, const char *properties_json) {
@@ -690,9 +760,45 @@ int64_t cbm_gbuf_upsert_node(cbm_gbuf_t *gb, const char *label, const char *name
         if (c == 0) {
             c = strcmp(existing->label ? existing->label : "", label ? label : "");
         }
+
+        /* Overloaded methods/functions (JDBI DAO interfaces, C++ overloads,
+         * Python @overload, ...) legitimately share one qualified_name — this
+         * tool resolves calls by name only, not by signature, so it can't tell
+         * them apart at the QN level and the tie-break above still has to pick
+         * one canonical survivor (CALLS-edge resolution is unaffected either
+         * way). Gated to same-file arrivals at DIFFERENT lines so a plain
+         * re-emit of the same definition (incremental refresh) still updates
+         * in place untouched. */
+        bool overload_collision =
+            existing->label && label && strcmp(existing->label, label) == 0 &&
+            (strcmp(label, "Method") == 0 || strcmp(label, "Function") == 0) && file_path &&
+            existing->file_path && strcmp(file_path, existing->file_path) == 0 &&
+            existing->start_line != start_line;
+
         if (c > 0) {
+            if (overload_collision) {
+                char *merged = gb_stash_sibling_overload(existing->properties_json, name,
+                                                         qualified_name, file_path, start_line,
+                                                         end_line, properties_json);
+                if (merged) {
+                    free(existing->properties_json);
+                    existing->properties_json = merged;
+                }
+            }
             return existing->id; /* existing entity is the canonical winner */
         }
+
+        const char *props_for_update = properties_json;
+        char *merged_for_update = NULL;
+        if (overload_collision) {
+            merged_for_update = gb_stash_sibling_overload(
+                properties_json, existing->name, existing->qualified_name, existing->file_path,
+                existing->start_line, existing->end_line, existing->properties_json);
+            if (merged_for_update) {
+                props_for_update = merged_for_update;
+            }
+        }
+
         /* Update in-place. name/properties are strdup'd BEFORE freeing old ones
          * (callers may pass existing->name as an argument). label/file_path are
          * interned: gb_intern returns a stable pool pointer (idempotent even when
@@ -702,7 +808,8 @@ int64_t cbm_gbuf_upsert_node(cbm_gbuf_t *gb, const char *label, const char *name
          * label/name — cbm_gbuf_find_by_label/name then missed or mis-listed it,
          * which is how the flickering Function set reached the semantic pass). */
         char *new_name = heap_strdup(name);
-        char *new_props = properties_json ? heap_strdup(properties_json) : NULL;
+        char *new_props = props_for_update ? heap_strdup(props_for_update) : NULL;
+        free(merged_for_update);
         const char *new_label_interned = gb_intern(gb, label);
         bool label_changed = !existing->label || !new_label_interned ||
                              strcmp(existing->label, new_label_interned) != 0;

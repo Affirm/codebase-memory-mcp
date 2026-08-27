@@ -8,6 +8,7 @@
 #include "graph_buffer/graph_buffer.h"
 #include "store/store.h"
 #include <string.h>
+#include <yyjson/yyjson.h>
 
 /* ── Node operations ───────────────────────────────────────────── */
 
@@ -461,6 +462,79 @@ TEST(gbuf_upsert_same_qn_updates_all_fields) {
     ASSERT_EQ(n->start_line, 20);
     ASSERT_EQ(n->end_line, 30);
     ASSERT_STR_EQ(n->properties_json, "{\"k\":\"v2\"}");
+
+    cbm_gbuf_free(gb);
+    PASS();
+}
+
+/* JDBI-style overloaded interface methods (findById(long) / findById(String))
+ * share one qualified_name; the tool resolves by name, not signature, so the
+ * QN collision is unavoidable. Regression for the "loser silently vanishes"
+ * bug: both signatures must survive, one as the node, one stashed in
+ * sibling_overloads on it — not just whichever arrived last. */
+TEST(gbuf_upsert_overload_collision_stashes_loser) {
+    cbm_gbuf_t *gb = cbm_gbuf_new("test", "/tmp");
+    cbm_gbuf_upsert_node(gb, "Method", "findById", "Dao.findById", "Dao.java", 10, 12,
+                         "{\"signature\":\"(long id)\"}");
+    cbm_gbuf_upsert_node(gb, "Method", "findById", "Dao.findById", "Dao.java", 20, 22,
+                         "{\"signature\":\"(String id)\"}");
+
+    /* Exactly one node — the QN collision still resolves to a single survivor
+     * (CALLS-edge resolution is unaffected), but nothing was destroyed. */
+    ASSERT_EQ(cbm_gbuf_node_count(gb), 1);
+    const cbm_gbuf_node_t *n = cbm_gbuf_find_by_qn(gb, "Dao.findById");
+    ASSERT_NOT_NULL(n);
+    /* Later-line arrival is still the canonical survivor's content. */
+    ASSERT_EQ(n->start_line, 20);
+
+    yyjson_doc *doc = yyjson_read(n->properties_json, strlen(n->properties_json), 0);
+    ASSERT_NOT_NULL(doc);
+    yyjson_val *root = yyjson_doc_get_root(doc);
+    ASSERT_STR_EQ(yyjson_get_str(yyjson_obj_get(root, "signature")), "(String id)");
+    yyjson_val *siblings = yyjson_obj_get(root, "sibling_overloads");
+    ASSERT_NOT_NULL(siblings);
+    ASSERT_TRUE(yyjson_is_arr(siblings));
+    ASSERT_EQ((int)yyjson_arr_size(siblings), 1);
+    yyjson_val *sib = yyjson_arr_get(siblings, 0);
+    ASSERT_EQ((int)yyjson_get_int(yyjson_obj_get(sib, "start_line")), 10);
+    ASSERT_STR_EQ(yyjson_get_str(yyjson_obj_get(sib, "qualified_name")), "Dao.findById");
+    yyjson_val *sib_props = yyjson_obj_get(sib, "properties");
+    ASSERT_NOT_NULL(sib_props);
+    ASSERT_STR_EQ(yyjson_get_str(yyjson_obj_get(sib_props, "signature")), "(long id)");
+    yyjson_doc_free(doc);
+
+    /* A third overload arriving later flattens onto the same array instead of
+     * nesting — both earlier siblings stay directly reachable. */
+    cbm_gbuf_upsert_node(gb, "Method", "findById", "Dao.findById", "Dao.java", 30, 32,
+                         "{\"signature\":\"(long id, boolean lock)\"}");
+    ASSERT_EQ(cbm_gbuf_node_count(gb), 1);
+    n = cbm_gbuf_find_by_qn(gb, "Dao.findById");
+    doc = yyjson_read(n->properties_json, strlen(n->properties_json), 0);
+    ASSERT_NOT_NULL(doc);
+    root = yyjson_doc_get_root(doc);
+    siblings = yyjson_obj_get(root, "sibling_overloads");
+    ASSERT_NOT_NULL(siblings);
+    ASSERT_EQ((int)yyjson_arr_size(siblings), 2); /* flattened, not nested */
+    yyjson_doc_free(doc);
+
+    cbm_gbuf_free(gb);
+    PASS();
+}
+
+/* A same-file, same-line re-emit (incremental refresh of the exact same
+ * definition) must NOT be treated as an overload collision. */
+TEST(gbuf_upsert_same_location_refresh_no_sibling_stash) {
+    cbm_gbuf_t *gb = cbm_gbuf_new("test", "/tmp");
+    cbm_gbuf_upsert_node(gb, "Method", "findById", "Dao.findById", "Dao.java", 10, 12,
+                         "{\"signature\":\"(long id)\"}");
+    cbm_gbuf_upsert_node(gb, "Method", "findById", "Dao.findById", "Dao.java", 10, 15,
+                         "{\"signature\":\"(long id) v2\"}");
+
+    ASSERT_EQ(cbm_gbuf_node_count(gb), 1);
+    const cbm_gbuf_node_t *n = cbm_gbuf_find_by_qn(gb, "Dao.findById");
+    ASSERT_NOT_NULL(n);
+    ASSERT_EQ(n->end_line, 15);
+    ASSERT_STR_EQ(n->properties_json, "{\"signature\":\"(long id) v2\"}");
 
     cbm_gbuf_free(gb);
     PASS();
@@ -1037,6 +1111,8 @@ SUITE(graph_buffer) {
     RUN_TEST(gbuf_upsert_null_qn);
     RUN_TEST(gbuf_upsert_empty_qn);
     RUN_TEST(gbuf_upsert_same_qn_updates_all_fields);
+    RUN_TEST(gbuf_upsert_overload_collision_stashes_loser);
+    RUN_TEST(gbuf_upsert_same_location_refresh_no_sibling_stash);
     RUN_TEST(gbuf_upsert_long_qn);
     RUN_TEST(gbuf_find_by_qn_missing);
     RUN_TEST(gbuf_find_by_id_missing);
