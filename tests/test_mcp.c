@@ -8121,6 +8121,77 @@ TEST(tool_resolve_store_by_internal_name_issue704) {
     PASS();
 }
 
+/* Bug: search_graph with label:"Function" returns a clean zero for a name
+ * that exists as a Method node (JDBI/interface methods, for one), reading
+ * exactly like "this doesn't exist" instead of "wrong label". An agent that
+ * trusts a clean zero-result response will confidently report a real symbol
+ * as absent. Verify the zero-result hint instead points at the sibling
+ * label the pattern actually matches under. */
+TEST(search_graph_zero_result_hints_sibling_label) {
+    char cache[256];
+    snprintf(cache, sizeof(cache), "/tmp/cbm-label-hint-XXXXXX");
+    if (!cbm_mkdtemp(cache)) {
+        PASS(); /* skip if mkdtemp fails — not a signal for this test */
+    }
+
+    static const char project[] = "label-hint-project";
+    char db_path[512];
+    snprintf(db_path, sizeof(db_path), "%s/%s.db", cache, project);
+
+    cbm_store_t *st = cbm_store_open_path(db_path);
+    ASSERT_NOT_NULL(st);
+    ASSERT_EQ(cbm_store_upsert_project(st, project, cache), CBM_STORE_OK);
+    char qn[256];
+    snprintf(qn, sizeof(qn), "%s.Dao.findById", project);
+    cbm_node_t n = {0};
+    n.project = project;
+    n.label = "Method";
+    n.name = "findById";
+    n.qualified_name = qn;
+    n.file_path = "Dao.java";
+    n.start_line = 1;
+    n.end_line = 2;
+    ASSERT_GT(cbm_store_upsert_node(st, &n), 0);
+    cbm_store_close(st);
+
+    const char *saved = getenv("CBM_CACHE_DIR");
+    char *saved_copy = saved ? strdup(saved) : NULL;
+    cbm_setenv("CBM_CACHE_DIR", cache, 1);
+
+    cbm_mcp_server_t *srv = cbm_mcp_server_new(NULL);
+    ASSERT_NOT_NULL(srv);
+
+    char args[512];
+    snprintf(args, sizeof(args),
+             "{\"project\":\"%s\",\"label\":\"Function\",\"name_pattern\":\"findById\"}", project);
+    char *resp = cbm_mcp_handle_tool(srv, "search_graph", args);
+    ASSERT_NOT_NULL(resp);
+    ASSERT_NOT_NULL(strstr(resp, "Method"));
+    ASSERT_NOT_NULL(strstr(resp, "retry with label"));
+
+    /* format:"json" must carry the same hint. */
+    snprintf(args, sizeof(args),
+             "{\"project\":\"%s\",\"label\":\"Function\",\"name_pattern\":\"findById\","
+             "\"format\":\"json\"}",
+             project);
+    char *json_resp = cbm_mcp_handle_tool(srv, "search_graph", args);
+    ASSERT_NOT_NULL(json_resp);
+    ASSERT_NOT_NULL(strstr(json_resp, "retry with label"));
+
+    free(resp);
+    free(json_resp);
+    cbm_mcp_server_free(srv);
+
+    if (saved_copy) {
+        cbm_setenv("CBM_CACHE_DIR", saved_copy, 1);
+        free(saved_copy);
+    } else {
+        cbm_unsetenv("CBM_CACHE_DIR");
+    }
+    th_rmtree(cache);
+    PASS();
+}
+
 /* ── #1044: a "<name>::missed" shadow row must not hide the project ──
  *
  * The miss-graph pass inserts a second `projects` row ("<name>::missed") so
@@ -10547,6 +10618,7 @@ SUITE(mcp) {
     RUN_TEST(tool_bad_project_name_no_overflow_issue235);
     RUN_TEST(tool_bad_project_error_valid_json_issue235);
     RUN_TEST(tool_resolve_store_by_internal_name_issue704);
+    RUN_TEST(search_graph_zero_result_hints_sibling_label);
     RUN_TEST(tool_list_projects_ignores_missed_shadow_issue1044);
 
     /* auto_watch gate (distilled from PR #625) */
