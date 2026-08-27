@@ -281,6 +281,61 @@ TEST(pipeline_structure_nodes) {
     PASS();
 }
 
+/* Bug: cbm_pipeline_publish_staged never called cbm_store_upsert_project, the
+ * only place that creates store_meta (db_uid/mutation_gen). The byte-level
+ * writer hand-builds the projects row directly, so a store's generation
+ * stayed "legacy" forever, and trace_path refuses to ever mint a pagination
+ * cursor under "legacy" -- a normal index_repository run could never escape
+ * it. Verify a fresh full index leaves the store on a real generation, and a
+ * second publish (of either route: rebuild or incremental patch) advances it,
+ * so cursors minted against the first publish are correctly seen as stale. */
+TEST(pipeline_publish_escapes_legacy_generation) {
+    if (setup_test_repo() != 0) {
+        FAIL("failed to create temp dir");
+    }
+
+    char db_path[512];
+    snprintf(db_path, sizeof(db_path), "%s/gen_test.db", g_tmpdir);
+
+    cbm_pipeline_t *p1 = cbm_pipeline_new(g_tmpdir, db_path, CBM_MODE_FULL);
+    ASSERT_NOT_NULL(p1);
+    ASSERT_EQ(cbm_pipeline_run(p1), 0);
+    cbm_pipeline_free(p1);
+
+    cbm_store_t *s1 = cbm_store_open_path(db_path);
+    ASSERT_NOT_NULL(s1);
+    char gen1[128];
+    ASSERT_EQ(cbm_store_generation(s1, gen1, sizeof(gen1)), CBM_STORE_OK);
+    cbm_store_close(s1);
+    ASSERT_TRUE(strcmp(gen1, "legacy") != 0);
+
+    /* An unchanged re-run is a legitimate no-op (incremental.noop) that skips
+     * publish entirely -- edit a file first so this run actually republishes
+     * (via the incremental delta route, since it's a single small edit). */
+    char main_go_path[512];
+    snprintf(main_go_path, sizeof(main_go_path), "%s/main.go", g_tmpdir);
+    FILE *edit_f = fopen(main_go_path, "a");
+    ASSERT_NOT_NULL(edit_f);
+    fprintf(edit_f, "\n// generation-bump edit\n");
+    fclose(edit_f);
+
+    cbm_pipeline_t *p2 = cbm_pipeline_new(g_tmpdir, db_path, CBM_MODE_FULL);
+    ASSERT_NOT_NULL(p2);
+    ASSERT_EQ(cbm_pipeline_run(p2), 0);
+    cbm_pipeline_free(p2);
+
+    cbm_store_t *s2 = cbm_store_open_path(db_path);
+    ASSERT_NOT_NULL(s2);
+    char gen2[128];
+    ASSERT_EQ(cbm_store_generation(s2, gen2, sizeof(gen2)), CBM_STORE_OK);
+    cbm_store_close(s2);
+    ASSERT_TRUE(strcmp(gen2, "legacy") != 0);
+    ASSERT_TRUE(strcmp(gen1, gen2) != 0);
+
+    teardown_test_repo();
+    PASS();
+}
+
 /* Issue #516: an ADR stored via manage_adr (project_summaries) must survive a
  * full re-index. A full re-index deletes the DB and rebuilds it from the graph
  * buffer, which writes an empty project_summaries table; the fix captures the
@@ -11223,6 +11278,7 @@ SUITE(pipeline) {
     RUN_TEST(store_bulk_persistence);
     /* Integration: structure pass */
     RUN_TEST(pipeline_structure_nodes);
+    RUN_TEST(pipeline_publish_escapes_legacy_generation);
     RUN_TEST(pipeline_committed_counts_match_persisted);
     RUN_TEST(pipeline_adr_survives_full_reindex);
     RUN_TEST(pipeline_structure_edges);

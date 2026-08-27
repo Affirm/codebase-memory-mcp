@@ -1722,6 +1722,20 @@ int cbm_pipeline_publish_staged(char *stage_path, const cbm_pipeline_generation_
     cbm_project_t project_info = {0};
     bool have_project_info =
         cbm_store_get_project(store, generation->project, &project_info) == CBM_STORE_OK;
+    /* Stamp a fresh generation (store_meta's db_uid/mutation_gen) on every
+     * publish. The byte-level writer above hand-builds the projects row
+     * directly (sqlite_writer.c) and never calls this, so without it a
+     * project's store never gains a store_meta table and cbm_store_generation
+     * reports "legacy" forever -- trace_path then refuses to ever mint a
+     * pagination cursor for it, regardless of how many times it's reindexed. */
+    if (ok && have_project_info) {
+        ok = cbm_store_upsert_project(store, generation->project, project_info.root_path) ==
+             CBM_STORE_OK;
+        cbm_project_free_fields(&project_info);
+        have_project_info =
+            ok && cbm_store_get_project(store, generation->project, &project_info) ==
+                      CBM_STORE_OK;
+    }
     cbm_log_info("publish.timing", "block", "get_project", "elapsed_ms",
                  itoa_buf((int)elapsed_ms(t_pub)));
     cbm_clock_gettime(CLOCK_MONOTONIC, &t_pub);
